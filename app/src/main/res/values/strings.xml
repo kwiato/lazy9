@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lazy9</string>
+
+    <string name="a11y_label">Lazy9 gestures</string>
+    <string name="a11y_desc">Lets the launcher turn the screen off on a double tap and open notifications on a swipe down. It does not read anything on the screen.</string>
+
+    <string name="menu_app_info">App info</string>
+    <string name="menu_uninstall">Uninstall</string>
+    <string name="menu_add_home">Add to home screen</string>
+    <string name="menu_add_dock">Add to dock</string>
+    <string name="menu_remove_home">Remove from home screen</string>
+    <string name="menu_remove_dock">Remove from dock</string>
+    <string name="menu_replace_dock">Replace</string>
+    <string name="menu_remove_widget">Remove widget</string>
+    <string name="menu_resize">Resize</string>
+
+    <string name="home_widgets">Widgets</string>
+    <string name="home_wallpaper">Wallpaper</string>
+    <string name="home_settings">Launcher settings</string>
+    <string name="home_add_page">Add page</string>
+    <string name="home_remove_page">Remove this page</string>
+
+    <string name="dock_empty">Add app</string>
+    <string name="dock_search">T9 search</string>
+    <string name="drawer_pick_title">Choose an app for the dock</string>
+
+    <string name="t9_hint">Type the app name on the keypad</string>
+    <string name="t9_no_results">No matching apps</string>
+    <string name="t9_backspace">Delete</string>
+    <string name="t9_close">Close</string>
+
+    <string name="lock_dialog_title">Double tap to turn the screen off</string>
+    <string name="lock_dialog_text">To turn the screen off (without breaking fingerprint unlock) the launcher needs its accessibility service switched on.\n\nOn Android 13 and newer you may first have to allow restricted settings: App info → ⋮ → Allow restricted settings.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+
+    <string name="settings_default_launcher">Default launcher</string>
+    <string name="settings_default_yes">Lazy9 is the default</string>
+    <string name="settings_default_no">Tap to choose Lazy9</string>
+    <string name="settings_gestures">Screen-off gesture</string>
+    <string name="settings_gestures_on">Accessibility service is on</string>
+    <string name="settings_gestures_off">Tap to switch the accessibility service on</string>
+    <string name="settings_autolaunch">Launch a single T9 match</string>
+    <string name="settings_autolaunch_desc">Open the app straight away when only one matches</string>
+
+    <string name="widget_unavailable">Widget unavailable</string>
+    <string name="widget_width">Width</string>
+    <string name="widget_height">Height</string>
+    <string name="widgets_none">No widgets installed</string>
+    <string name="widget_failed">Couldn\'t add the widget</string>
+</resources>

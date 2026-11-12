@@ -1,0 +1,238 @@
+package io.github.kwiato.lazy9.ui
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Backspace
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.kwiato.lazy9.LauncherViewModel
+import io.github.kwiato.lazy9.R
+
+private const val MAX_RESULTS = 3
+
+/** Opaque, so the desktop underneath doesn't show through the card. */
+private val CardColor = Color(0xFF171A21)
+
+private val KEYS = listOf(
+    "1" to "", "2" to "ABC", "3" to "DEF",
+    "4" to "GHI", "5" to "JKL", "6" to "MNO",
+    "7" to "PQRS", "8" to "TUV", "9" to "WXYZ",
+)
+
+/** The T9 search card: results on top, the keypad under the thumb. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun T9Search(
+    vm: LauncherViewModel,
+    /** Centre of the dock's T9 button in root coordinates — where the card grows from. */
+    origin: Offset,
+    /** 0..1: how far the circular reveal has spread. Read while drawing only. */
+    reveal: () -> Float,
+    onClose: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var cardPos by remember { mutableStateOf(Offset.Zero) }
+    val haptic = LocalHapticFeedback.current
+    val matches = remember(query, vm.apps, vm.state.usage) { vm.search(query) }
+    val shown = matches.take(MAX_RESULTS)
+
+    if (vm.state.autoLaunch) {
+        LaunchedEffect(matches) {
+            if (query.length >= 2 && matches.size == 1) {
+                vm.launch(matches[0])
+                onClose()
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        // Tapping the wallpaper above the panel dismisses it.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClose,
+                ),
+        )
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = 28.dp, end = 28.dp, bottom = 16.dp)
+                .widthIn(max = 340.dp)
+                .fillMaxWidth()
+                .onGloballyPositioned { cardPos = it.positionInRoot() }
+                // The card spreads out of the T9 button like a ripple.
+                .drawWithContent {
+                    val progress = reveal()
+                    if (progress >= 1f) {
+                        drawContent()
+                    } else {
+                        val c = if (origin.isSpecified) origin - cardPos else Offset(size.width / 2, size.height)
+                        val reach = maxOf(
+                            c.getDistance(),
+                            (c - Offset(size.width, 0f)).getDistance(),
+                            (c - Offset(0f, size.height)).getDistance(),
+                            (c - Offset(size.width, size.height)).getDistance(),
+                        )
+                        val circle = Path().apply { addOval(Rect(c, reach * progress)) }
+                        clipPath(circle) { this@drawWithContent.drawContent() }
+                    }
+                }
+                .clip(RoundedCornerShape(32.dp))
+                .background(CardColor)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                )
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Results: up to three icons, best match first, centred when fewer.
+            // Deliberately bare: no typed digits, no labels, no hint.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (shown.isEmpty()) {
+                    if (query.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.t9_no_results),
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.Center) {
+                        for (app in shown) {
+                            AppIcon(
+                                app,
+                                Modifier
+                                    .width(88.dp)
+                                    .height(80.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .clickable {
+                                        vm.launch(app)
+                                        onClose()
+                                    },
+                                showLabel = false,
+                                iconSize = 56.dp,
+                            )
+                        }
+                    }
+                }
+            }
+
+            for (row in KEYS.chunked(3)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((digit, letters) in row) {
+                        Key(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            // 1 carries no letters, so it clears the search instead.
+                            if (digit == "1") query = "" else query += digit
+                        }) {
+                            if (digit == "1") ClearKeyLabel() else KeyLabel(digit, letters)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RowScope.Key(
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .weight(1f)
+            .height(56.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+@Composable
+private fun ClearKeyLabel() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("1", color = Color.White, fontSize = 22.sp, lineHeight = 24.sp)
+        Icon(
+            Icons.AutoMirrored.Outlined.Backspace,
+            contentDescription = stringResource(R.string.t9_backspace),
+            tint = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier.size(13.dp),
+        )
+    }
+}
+
+@Composable
+private fun KeyLabel(digit: String, letters: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(digit, color = Color.White, fontSize = 22.sp, lineHeight = 24.sp)
+        if (letters.isNotEmpty()) {
+            Text(
+                letters,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                letterSpacing = 1.5.sp,
+            )
+        }
+    }
+}

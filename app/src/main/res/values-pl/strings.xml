@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_label">Gesty Lazy9</string>
+    <string name="a11y_desc">Pozwala launcherowi wygasić ekran podwójnym tapnięciem i otworzyć powiadomienia przesunięciem w dół. Nie odczytuje niczego z ekranu.</string>
+
+    <string name="menu_app_info">Informacje o aplikacji</string>
+    <string name="menu_uninstall">Odinstaluj</string>
+    <string name="menu_add_home">Dodaj do pulpitu</string>
+    <string name="menu_add_dock">Dodaj do paska</string>
+    <string name="menu_remove_home">Usuń z pulpitu</string>
+    <string name="menu_remove_dock">Usuń z paska</string>
+    <string name="menu_replace_dock">Zamień</string>
+    <string name="menu_remove_widget">Usuń widżet</string>
+    <string name="menu_resize">Zmień rozmiar</string>
+
+    <string name="home_widgets">Widżety</string>
+    <string name="home_wallpaper">Tapeta</string>
+    <string name="home_settings">Ustawienia launchera</string>
+    <string name="home_add_page">Dodaj stronę</string>
+    <string name="home_remove_page">Usuń tę stronę</string>
+
+    <string name="dock_empty">Dodaj aplikację</string>
+    <string name="dock_search">Wyszukiwarka T9</string>
+    <string name="drawer_pick_title">Wybierz aplikację do paska</string>
+
+    <string name="t9_hint">Wpisz nazwę aplikacji na klawiaturze</string>
+    <string name="t9_no_results">Brak pasujących aplikacji</string>
+    <string name="t9_backspace">Usuń</string>
+    <string name="t9_close">Zamknij</string>
+
+    <string name="lock_dialog_title">Wygaszanie ekranu podwójnym tapnięciem</string>
+    <string name="lock_dialog_text">Żeby wygasić ekran (bez psucia odblokowywania odciskiem palca), launcher potrzebuje włączonej usługi ułatwień dostępu.\n\nNa Androidzie 13 i nowszych trzeba najpierw zezwolić na ustawienia z ograniczeniami: Informacje o aplikacji → ⋮ → Zezwól na ustawienia z ograniczeniami.</string>
+    <string name="open_settings">Otwórz ustawienia</string>
+    <string name="cancel">Anuluj</string>
+    <string name="done">Gotowe</string>
+
+    <string name="settings_default_launcher">Domyślny launcher</string>
+    <string name="settings_default_yes">Lazy9 jest domyślny</string>
+    <string name="settings_default_no">Dotknij, żeby wybrać Lazy9</string>
+    <string name="settings_gestures">Gest wygaszania ekranu</string>
+    <string name="settings_gestures_on">Usługa ułatwień dostępu jest włączona</string>
+    <string name="settings_gestures_off">Dotknij, żeby włączyć usługę ułatwień dostępu</string>
+    <string name="settings_autolaunch">Uruchamiaj jedyne dopasowanie T9</string>
+    <string name="settings_autolaunch_desc">Otwórz aplikację od razu, gdy pasuje tylko jedna</string>
+
+    <string name="widget_unavailable">Widżet niedostępny</string>
+    <string name="widget_width">Szerokość</string>
+    <string name="widget_height">Wysokość</string>
+    <string name="widgets_none">Brak zainstalowanych widżetów</string>
+    <string name="widget_failed">Nie udało się dodać widżetu</string>
+</resources>
