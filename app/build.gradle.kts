@@ -20,8 +20,25 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Releases are signed with a private key that lives outside the repo (CI
+    // gets it from secrets). Without it — a plain local build — the release
+    // falls back to the debug key, so it still installs, just not as an update
+    // of a CI-built APK.
+    val keystore = System.getenv("LAZY9_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = keystore
+                storePassword = System.getenv("LAZY9_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("LAZY9_KEY_ALIAS")
+                keyPassword = System.getenv("LAZY9_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

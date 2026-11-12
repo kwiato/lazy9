@@ -11,3 +11,7 @@ build/
 local.properties
 *.keystore
 !debug.keystore
+
+# Release signing key - never committed (CI gets it from repo secrets).
+/signing/
+*.jks
