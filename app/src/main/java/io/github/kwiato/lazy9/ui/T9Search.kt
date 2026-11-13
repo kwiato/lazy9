@@ -61,6 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kwiato.lazy9.LauncherHost
@@ -113,7 +116,7 @@ fun T9Search(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(start = 28.dp, end = 28.dp, bottom = 16.dp)
-                .widthIn(max = 340.dp)
+                .widthIn(max = 340.dp * vm.state.cardWidth)
                 .fillMaxWidth()
                 .onGloballyPositioned { cardPos = it.positionInRoot() }
                 // The card spreads out of the T9 button like a ripple.
@@ -232,12 +235,14 @@ fun T9Panel(
         for (row in KEYS.chunked(3)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((digit, letters) in row) {
-                    Key(onClick = {
+                    Key(height = vm.state.keyHeight.dp, onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         // 1 carries no letters, so it clears the search instead.
                         if (digit == "1") query = "" else query += digit
                     }) {
-                        if (digit == "1") ClearKeyLabel() else KeyLabel(digit, letters)
+                        val digitSp = vm.state.digitSize.sp
+                        val letterSp = vm.state.letterSize.sp
+                        if (digit == "1") ClearKeyLabel(digitSp, letterSp) else KeyLabel(digit, letters, digitSp, letterSp)
                     }
                 }
             }
@@ -385,6 +390,7 @@ private fun ContactMenu(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RowScope.Key(
+    height: Dp,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
@@ -392,7 +398,7 @@ private fun RowScope.Key(
     Box(
         Modifier
             .weight(1f)
-            .height(56.dp)
+            .height(height)
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
@@ -400,28 +406,28 @@ private fun RowScope.Key(
 }
 
 @Composable
-private fun ClearKeyLabel() {
+private fun ClearKeyLabel(digitSize: TextUnit, letterSize: TextUnit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("1", fontSize = 22.sp, lineHeight = 24.sp)
+        Text("1", fontSize = digitSize, lineHeight = digitSize * 1.1f)
         Icon(
             Icons.AutoMirrored.Outlined.Backspace,
             contentDescription = stringResource(R.string.t9_backspace),
             tint = LocalContentColor.current.copy(alpha = 0.6f),
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(with(LocalDensity.current) { (letterSize * 1.3f).toDp() }),
         )
     }
 }
 
 @Composable
-private fun KeyLabel(digit: String, letters: String) {
+private fun KeyLabel(digit: String, letters: String, digitSize: TextUnit, letterSize: TextUnit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(digit, fontSize = 22.sp, lineHeight = 24.sp)
+        Text(digit, fontSize = digitSize, lineHeight = digitSize * 1.1f)
         if (letters.isNotEmpty()) {
             Text(
                 letters,
                 color = LocalContentColor.current.copy(alpha = 0.6f),
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
+                fontSize = letterSize,
+                lineHeight = letterSize * 1.2f,
                 letterSpacing = 1.5.sp,
             )
         }

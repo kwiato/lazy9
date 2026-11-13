@@ -16,6 +16,15 @@ class StateStore(context: Context) {
         LauncherState()
     }
 
+    fun encode(state: LauncherState): String = json.encodeToString(state)
+
+    /** Null unless [text] looks like an exported Lazy9 layout. */
+    fun decode(text: String): LauncherState? = try {
+        if ("\"items\"" !in text || "\"dock\"" !in text) null else json.decodeFromString<LauncherState>(text)
+    } catch (e: Exception) {
+        null
+    }
+
     fun save(state: LauncherState) {
         try {
             val tmp = File(file.parentFile, "state.json.tmp")

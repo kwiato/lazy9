@@ -55,7 +55,21 @@
 
     <string name="settings_mono">Monochromatyczne ikony</string>
     <string name="settings_mono_desc">Jednokolorowe ikony w barwach tapety; aplikacje bez takiej ikony stają się szare</string>
-    <string name="settings_card">Tło karty T9</string>
+    <string name="settings_card">Wygląd karty T9</string>
+    <string name="settings_card_desc">Kolor, krycie, rozmiar karty i tekstu</string>
+    <string name="card_width">Szerokość</string>
+    <string name="card_height">Wys. klawiszy</string>
+    <string name="card_digits">Cyfry</string>
+    <string name="card_letters">Litery</string>
+    <string name="settings_export">Eksportuj ustawienia</string>
+    <string name="settings_export_desc">Zapisz układ i wszystkie opcje do pliku</string>
+    <string name="settings_import">Importuj ustawienia</string>
+    <string name="settings_import_desc">Zastąp wszystko zapisanym plikiem</string>
+    <string name="export_done">Zapisano ustawienia</string>
+    <string name="export_failed">Nie udało się zapisać ustawień</string>
+    <string name="import_done">Wczytano ustawienia</string>
+    <string name="import_failed">To nie jest plik ustawień Lazy9</string>
+    <string name="drag_remove">Usuń</string>
     <string name="settings_card_opacity">Krycie</string>
 
     <string name="widget_unavailable">Widżet niedostępny</string>

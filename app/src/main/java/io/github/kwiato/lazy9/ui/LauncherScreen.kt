@@ -31,16 +31,21 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.InvertColors
@@ -56,12 +61,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -74,8 +81,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -112,6 +123,7 @@ fun LauncherScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var lockHelp by remember { mutableStateOf(false) }
     val dnd = remember { DragDrop() }
+    var cardEditor by remember { mutableStateOf(false) }
 
     // Bumped to drop whatever is typed into the persistent keypad: when the
     // launcher goes to the background (an app was opened) and on HOME.
@@ -123,7 +135,7 @@ fun LauncherScreen(
         if (homeEvent.count == 0) return@LaunchedEffect
         val hadOverlay = drawerOpen || searchOpen || widgetsOpen || homeMenu || settingsOpen || lockHelp
         drawerOpen = false; searchOpen = false; widgetsOpen = false
-        homeMenu = false; settingsOpen = false; lockHelp = false
+        homeMenu = false; settingsOpen = false; lockHelp = false; cardEditor = false
         searchEpoch++
         if (homeEvent.onHome && !hadOverlay) pagerState.animateScrollToPage(0)
     }
@@ -138,9 +150,42 @@ fun LauncherScreen(
     // The home screen is the bottom of the back stack: back only closes overlays.
     BackHandler {
         when {
+            cardEditor -> {
+                cardEditor = false
+                searchOpen = false
+            }
             widgetsOpen -> widgetsOpen = false
             searchOpen -> searchOpen = false
             drawerOpen -> drawerOpen = false
+        }
+    }
+
+    // An app dragged out of the drawer or off the dock was let go.
+    SideEffect {
+        dnd.onDrop = {
+            val app = dnd.app
+            val from = dnd.fromSlot
+            val slot = dnd.hoverSlot
+            val remove = dnd.overRemove
+            val cell = dnd.cellAt?.invoke(dnd.pointer)
+            val page = pagerState.currentPage
+            dnd.app = null
+            dnd.fromSlot = null
+            dnd.hoverSlot = null
+            dnd.overRemove = false
+            dnd.removable = false
+            drawerOpen = false
+            if (app != null) {
+                when {
+                    // off the dock: remove, swap with another slot, or move to a free desktop cell
+                    from != null && remove -> vm.setDock(from, null)
+                    from != null && slot != null -> vm.swapDock(from, slot)
+                    from != null -> if (cell != null && vm.addAppAt(app.key, page, cell.x, cell.y)) vm.setDock(from, null)
+                    // out of the drawer: into a dock slot, or onto a free desktop cell
+                    slot != null -> vm.setDock(slot, app.key)
+                    cell != null -> vm.addAppAt(app.key, page, cell.x, cell.y)
+                }
+            }
         }
     }
 
@@ -195,7 +240,9 @@ fun LauncherScreen(
                         .height(IntrinsicSize.Min)
                         .padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
-                    T9Panel(vm, host, Modifier.weight(1f), resetKey = searchEpoch)
+                    Box(Modifier.weight(1f)) {
+                        T9Panel(vm, host, Modifier.fillMaxWidth(vm.state.cardWidth), resetKey = searchEpoch)
+                    }
                     SideDock(
                         vm, host, pickApp, dnd,
                         Modifier
@@ -234,19 +281,7 @@ fun LauncherScreen(
                     scope.launch { pagerState.animateScrollToPage(page) }
                 },
                 dnd = dnd,
-                onDrop = {
-                    // Onto a dock slot, or onto the desktop cell under the finger if it is free.
-                    val app = dnd.app
-                    val slot = dnd.hoverSlot
-                    val cell = dnd.cellAt?.invoke(dnd.pointer)
-                    dnd.app = null
-                    dnd.hoverSlot = null
-                    drawerOpen = false
-                    if (app != null) {
-                        if (slot != null) vm.setDock(slot, app.key)
-                        else if (cell != null) vm.addAppAt(app.key, pagerState.currentPage, cell.x, cell.y)
-                    }
-                },
+                onDrop = { dnd.onDrop() },
             )
         }
 
@@ -272,10 +307,40 @@ fun LauncherScreen(
                 transitionSpec = { tween(if (targetState == EnterExitState.Visible) 340 else 220) },
                 label = "t9 reveal",
             ) { if (it == EnterExitState.Visible) 1f else 0f }
-            T9Search(vm, origin = searchOrigin, reveal = { reveal }, host = host) { searchOpen = false }
+            T9Search(vm, origin = searchOrigin, reveal = { reveal }, host = host) {
+                // While its looks are being edited the card stays put as the preview.
+                if (!cardEditor) searchOpen = false
+            }
         }
 
-        // The app being dragged out of the drawer rides under the finger, above everything.
+        // Shown while a desktop item or a dock app is dragged: drop here to take it off.
+        if (dnd.removable) {
+            val over = dnd.overRemove
+            val reach = with(LocalDensity.current) { 28.dp.toPx() }
+            Row(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp)
+                    .onGloballyPositioned { dnd.removeZone = it.boundsInRoot().inflate(reach) }
+                    .background(if (over) Color(0xFFD64545) else ScrimColor, RoundedCornerShape(50))
+                    .padding(horizontal = 26.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Close, null, tint = Color.White)
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.drag_remove), color = Color.White)
+            }
+        }
+
+        if (cardEditor) {
+            CardEditor(vm, Modifier.align(Alignment.TopCenter)) {
+                cardEditor = false
+                searchOpen = false
+            }
+        }
+
+        // The app being dragged out of the drawer or off the dock rides under the finger, above everything.
         dnd.app?.let { app ->
             AppIcon(
                 app,
@@ -380,7 +445,29 @@ fun LauncherScreen(
                     stringResource(R.string.settings_mono_desc),
                     trailing = { Switch(checked = vm.state.monoIcons, onCheckedChange = { vm.setMonoIcons(it) }) },
                 ) { vm.setMonoIcons(!vm.state.monoIcons) }
-                CardBackgroundSetting(vm)
+                SheetRow(
+                    Icons.Outlined.Palette,
+                    stringResource(R.string.settings_card),
+                    stringResource(R.string.settings_card_desc),
+                ) {
+                    // Edited over the real card, so every change shows as it is made.
+                    settingsOpen = false
+                    cardEditor = true
+                    if (!vm.state.persistentSearch) searchOpen = true
+                }
+                SheetRow(
+                    Icons.Outlined.FileUpload,
+                    stringResource(R.string.settings_export),
+                    stringResource(R.string.settings_export_desc),
+                ) { host.exportSettings() }
+                SheetRow(
+                    Icons.Outlined.FileDownload,
+                    stringResource(R.string.settings_import),
+                    stringResource(R.string.settings_import_desc),
+                ) {
+                    settingsOpen = false
+                    host.importSettings()
+                }
             }
         }
     }
@@ -407,60 +494,99 @@ private val CARD_COLORS = listOf(
     0x171A21L, 0x000000L, 0x3A3F4BL, 0xFFFFFFL, 0x1B3558L, 0x1D4035L, 0x4A2338L, 0x4A3A1CL,
 )
 
-/** Colour swatches and an opacity slider for the T9 card. */
+/**
+ * Floats at the top of the screen while the real T9 card stays visible at the
+ * bottom, so colour, opacity, size and text changes are seen as they are made.
+ */
 @Composable
-private fun CardBackgroundSetting(vm: LauncherViewModel) {
-    Column(Modifier.padding(horizontal = 24.dp, vertical = 14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Palette, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(20.dp))
-            Text(stringResource(R.string.settings_card), style = MaterialTheme.typography.bodyLarge)
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            for (rgb in CARD_COLORS) {
-                val selected = vm.state.cardColor == rgb
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .border(
-                            if (selected) 3.dp else 1.dp,
-                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                            CircleShape,
-                        )
-                        .padding(if (selected) 5.dp else 1.dp)
-                        .background(Color(0xFF000000 or rgb), CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { vm.setCardColor(rgb) },
-                )
+private fun CardEditor(vm: LauncherViewModel, modifier: Modifier = Modifier, onDone: () -> Unit) {
+    Surface(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .pointerInput(Unit) { detectTapGestures {} }, // taps never reach the desktop
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+    ) {
+        Column(Modifier.padding(start = 20.dp, top = 14.dp, end = 20.dp, bottom = 6.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                for (rgb in CARD_COLORS) {
+                    val selected = vm.state.cardColor == rgb
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .border(
+                                if (selected) 3.dp else 1.dp,
+                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                CircleShape,
+                            )
+                            .padding(if (selected) 5.dp else 1.dp)
+                            .background(Color(0xFF000000 or rgb), CircleShape)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { vm.setCardColor(rgb) },
+                    )
+                }
+            }
+            val s = vm.state
+            SliderRow(R.string.settings_card_opacity, s.cardAlpha, 0f..1f, "${(s.cardAlpha * 100).roundToInt()}%") {
+                vm.setCardAlpha(it)
+            }
+            SliderRow(R.string.card_width, s.cardWidth, 0.5f..1f, "${(s.cardWidth * 100).roundToInt()}%") {
+                vm.setCardWidth(it)
+            }
+            SliderRow(R.string.card_height, s.keyHeight, 36f..88f, "${s.keyHeight.roundToInt()}") {
+                vm.setKeyHeight(it)
+            }
+            SliderRow(R.string.card_digits, s.digitSize, 12f..40f, "${s.digitSize.roundToInt()}") {
+                vm.setDigitSize(it)
+            }
+            SliderRow(R.string.card_letters, s.letterSize, 6f..20f, "${s.letterSize.roundToInt()}") {
+                vm.setLetterSize(it)
+            }
+            TextButton(onClick = onDone, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.done))
             }
         }
-        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.settings_card_opacity),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = vm.state.cardAlpha,
-                onValueChange = { vm.setCardAlpha(it) },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
-            )
-            Text(
-                "${(vm.state.cardAlpha * 100).roundToInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(36.dp),
-            )
-        }
+    }
+}
+
+@Composable
+private fun SliderRow(
+    label: Int,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    shown: String,
+    onChange: (Float) -> Unit,
+) {
+    Row(Modifier.height(44.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            stringResource(label),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(76.dp),
+        )
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+        )
+        Text(
+            shown,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(38.dp),
+        )
     }
 }
 

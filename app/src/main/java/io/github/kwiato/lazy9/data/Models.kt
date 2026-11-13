@@ -51,6 +51,13 @@ data class LauncherState(
     /** Background of the T9 card: 0xRRGGBB and its opacity, 0 (invisible) to 1. */
     val cardColor: Long = 0x171A21,
     val cardAlpha: Float = 1f,
+    /** Share of the available width the T9 card takes, 0.5 to 1. */
+    val cardWidth: Float = 1f,
+    /** Height of one keypad row, dp. */
+    val keyHeight: Float = 56f,
+    /** Size of the digits and of the letters under them, sp. */
+    val digitSize: Float = 22f,
+    val letterSize: Float = 10f,
     /** Draw app icons in one colour (the apps' own monochrome artwork where they ship it). */
     val monoIcons: Boolean = false,
     /** Starred contacts show up in T9 results; tapping one calls it. */

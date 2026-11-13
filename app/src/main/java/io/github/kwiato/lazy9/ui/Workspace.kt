@@ -203,21 +203,31 @@ fun Workspace(
                                                     ) {
                                                         cur.moved = true
                                                         menuId = null
+                                                        dnd.removable = true
                                                     }
-                                                    // Apps (not widgets) can be dropped on the dock.
+                                                    // Apps (not widgets) can be dropped on the dock;
+                                                    // anything can be dropped on "Remove".
+                                                    val root = ws.localToRoot(cur.pointer)
                                                     val isApp = vm.state.items.find { it.id == cur.itemId }?.appKey != null
+                                                    dnd.overRemove = cur.moved && dnd.removeZone.contains(root)
                                                     dnd.hoverSlot =
-                                                        if (cur.moved && isApp) dnd.slotAt(ws.localToRoot(cur.pointer)) else null
+                                                        if (cur.moved && isApp && !dnd.overRemove) dnd.slotAt(root) else null
                                                 }
                                             },
                                             onEnd = {
                                                 val cur = drag
                                                 val slot = dnd.hoverSlot
+                                                val remove = dnd.overRemove
                                                 drag = null
                                                 dnd.hoverSlot = null
+                                                dnd.overRemove = false
+                                                dnd.removable = false
                                                 val dropped = vm.state.items.find { it.id == cur?.itemId }
                                                 if (cur != null && cur.moved && dropped != null) {
-                                                    if (slot != null && dropped.appKey != null) {
+                                                    if (remove) {
+                                                        vm.removeItem(dropped.id)
+                                                        dropped.widgetId?.let { host.deleteWidget(it) }
+                                                    } else if (slot != null && dropped.appKey != null) {
                                                         vm.moveItemToDock(dropped.id, slot)
                                                     } else {
                                                         val cell = targetCell(cur, dropped)
@@ -278,7 +288,7 @@ fun Workspace(
         }
 
         // An app dragged out of the drawer: outline the cell it would land on.
-        if (dnd.app != null && dnd.hoverSlot == null) {
+        if (dnd.app != null && dnd.hoverSlot == null && !dnd.overRemove) {
             val cell = dnd.cellAt?.invoke(dnd.pointer)
             if (cell != null) {
                 val fits = vm.canPlace(null, pagerState.currentPage, cell.x, cell.y, 1, 1)
@@ -303,7 +313,7 @@ fun Workspace(
             val cell = targetCell(d, item)
             val fits = vm.canPlace(item.id, pagerState.currentPage, cell.x, cell.y, item.spanX, item.spanY)
             val shape = RoundedCornerShape(18.dp)
-            if (dnd.hoverSlot == null) Box(
+            if (dnd.hoverSlot == null && !dnd.overRemove) Box(
                 Modifier
                     .offset(cellW * cell.x, cellH * cell.y)
                     .size(cellW * item.spanX, cellH * item.spanY)

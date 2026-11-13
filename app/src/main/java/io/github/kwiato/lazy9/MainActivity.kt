@@ -56,6 +56,12 @@ interface LauncherHost {
 
     /** Runs a messenger's own action for a contact (message, call, …). */
     fun contactAction(action: ContactAction)
+
+    /** Lets the user save the layout and settings to a file of their choice… */
+    fun exportSettings()
+
+    /** …and load them back from one. */
+    fun importSettings()
 }
 
 /** Owns the AppWidgetHost and one host view per placed widget. */
@@ -112,6 +118,62 @@ class MainActivity : ComponentActivity(), LauncherHost {
     override fun call(contact: ContactEntry) {
         val action = if (vm.contactRepo.canCall()) Intent.ACTION_CALL else Intent.ACTION_DIAL
         tryStart(Intent(action, Uri.fromParts("tel", contact.number, null)))
+    }
+
+    private val exportDoc =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri == null) return@registerForActivityResult
+            val ok = try {
+                contentResolver.openOutputStream(uri)?.use { it.write(vm.exportState().toByteArray()) } != null
+            } catch (e: Exception) {
+                false
+            }
+            toast(if (ok) R.string.export_done else R.string.export_failed)
+        }
+
+    private val importDoc =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            val text = try {
+                contentResolver.openInputStream(uri)?.use { input ->
+                    // A layout is a few kilobytes; refuse anything absurd.
+                    val bytes = input.readNBytesCompat(MAX_IMPORT_BYTES + 1)
+                    if (bytes.size > MAX_IMPORT_BYTES) null else bytes.decodeToString()
+                }
+            } catch (e: Exception) {
+                null
+            }
+            val ok = text != null && vm.importState(text) { id -> widgets.manager.getAppWidgetInfo(id) != null }
+            toast(if (ok) R.string.import_done else R.string.import_failed)
+        }
+
+    private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (out.size() < limit) {
+            val n = read(buffer, 0, minOf(buffer.size, limit - out.size()))
+            if (n < 0) break
+            out.write(buffer, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    private fun toast(text: Int) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    override fun exportSettings() {
+        try {
+            exportDoc.launch("lazy9-settings.json")
+        } catch (e: Exception) {
+            toast(R.string.export_failed)
+        }
+    }
+
+    override fun importSettings() {
+        try {
+            importDoc.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+        } catch (e: Exception) {
+            toast(R.string.import_failed)
+        }
     }
 
     override fun sms(contact: ContactEntry) =
@@ -283,5 +345,6 @@ class MainActivity : ComponentActivity(), LauncherHost {
 
     private companion object {
         const val REQUEST_CONFIGURE = 4201
+        const val MAX_IMPORT_BYTES = 1 shl 20
     }
 }

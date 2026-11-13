@@ -198,6 +198,55 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         reload()
     }
 
+    fun setCardWidth(v: Float) = update { it.copy(cardWidth = v.coerceIn(0.5f, 1f)) }
+
+    fun setKeyHeight(v: Float) = update { it.copy(keyHeight = v.coerceIn(36f, 88f)) }
+
+    fun setDigitSize(v: Float) = update { it.copy(digitSize = v.coerceIn(12f, 40f)) }
+
+    fun setLetterSize(v: Float) = update { it.copy(letterSize = v.coerceIn(6f, 20f)) }
+
+    // ---- backup -------------------------------------------------------------
+
+    /** The whole layout and every setting as JSON, for the user to keep. */
+    fun exportState(): String = store.encode(state)
+
+    /**
+     * Replaces everything with a previously exported layout. Widgets only
+     * survive if their id is still bound on this device ([widgetExists]) —
+     * after a reinstall they are not, and have to be added again.
+     */
+    fun importState(text: String, widgetExists: (Int) -> Boolean): Boolean {
+        val s = store.decode(text) ?: return false
+        val pages = s.pages.coerceIn(1, 20)
+        val cols = s.cols.coerceIn(1, 12)
+        val rows = s.rows.coerceIn(1, 12)
+        val items = s.items.filter {
+            it.page in 0 until pages && it.spanX >= 1 && it.spanY >= 1 &&
+                it.x >= 0 && it.y >= 0 && it.x + it.spanX <= cols && it.y + it.spanY <= rows &&
+                (it.appKey != null || (it.widgetId != null && widgetExists(it.widgetId)))
+        }
+        update {
+            s.copy(
+                pages = pages,
+                cols = cols,
+                rows = rows,
+                items = items,
+                dock = (s.dock + List(4) { null }).take(4),
+                nextId = maxOf(s.nextId, (items.maxOfOrNull { it.id } ?: 0L) + 1),
+                cardAlpha = s.cardAlpha.coerceIn(0f, 1f),
+                cardColor = s.cardColor and 0xFFFFFF,
+                cardWidth = s.cardWidth.coerceIn(0.5f, 1f),
+                keyHeight = s.keyHeight.coerceIn(36f, 88f),
+                digitSize = s.digitSize.coerceIn(12f, 40f),
+                letterSize = s.letterSize.coerceIn(6f, 20f),
+            )
+        }
+        reload()
+        reloadContacts()
+        return true
+    }
+
     fun setCardAlpha(alpha: Float) = update { it.copy(cardAlpha = alpha.coerceIn(0f, 1f)) }
 
     /** Dock slots on screen: the column beside the persistent keypad only fits three. */
@@ -216,6 +265,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             when {
                 i == slot -> key
                 key != null && old == key -> null // an app sits in one slot only
+                else -> old
+            }
+        })
+    }
+
+    fun swapDock(a: Int, b: Int) = update { s ->
+        if (a !in s.dock.indices || b !in s.dock.indices || a == b) s
+        else s.copy(dock = s.dock.mapIndexed { i, old ->
+            when (i) {
+                a -> s.dock[b]
+                b -> s.dock[a]
                 else -> old
             }
         })

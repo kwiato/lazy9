@@ -150,9 +150,27 @@ class DragDrop {
     /** The dock slot under the finger while something droppable is dragged. */
     var hoverSlot by mutableStateOf<Int?>(null)
 
-    /** An app being dragged out of the drawer, and where the finger is. */
+    /** An app being dragged out of the drawer or off the dock, and where the finger is. */
     var app by mutableStateOf<AppEntry?>(null)
     var pointer by mutableStateOf(Offset.Zero)
+
+    /** The dock slot [app] was picked up from; null when it came out of the drawer. */
+    var fromSlot by mutableStateOf<Int?>(null)
+
+    /** True while the dragged thing can be dropped on the "Remove" target. */
+    var removable by mutableStateOf(false)
+    var removeZone = Rect.Zero
+    var overRemove by mutableStateOf(false)
+
+    /** Finishes a drag of [app]; set by the launcher screen. */
+    var onDrop: () -> Unit = {}
+
+    /** Follows the finger: which dock slot or target it is over. */
+    fun track(p: Offset) {
+        pointer = p
+        overRemove = removable && removeZone.contains(p)
+        hoverSlot = if (overRemove) null else slotAt(p)
+    }
 
     /** Desktop cell under a point, or null outside the desktop. Set by the workspace. */
     var cellAt: ((Offset) -> IntOffset?)? = null

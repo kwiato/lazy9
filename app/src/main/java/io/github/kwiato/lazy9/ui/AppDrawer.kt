@@ -100,10 +100,7 @@ fun AppDrawer(
                 dnd.pointer = p
                 dnd.app = app
             },
-            onMove = { p ->
-                dnd.pointer = p
-                dnd.hoverSlot = dnd.slotAt(p)
-            },
+            onMove = { p -> dnd.track(p) },
             onEnd = { drop() },
         )
     }

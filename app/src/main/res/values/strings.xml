@@ -57,7 +57,21 @@
 
     <string name="settings_mono">Monochrome icons</string>
     <string name="settings_mono_desc">One-colour app icons in the wallpaper palette; apps without such an icon turn grey</string>
-    <string name="settings_card">T9 card background</string>
+    <string name="settings_card">T9 card appearance</string>
+    <string name="settings_card_desc">Colour, opacity, size and text size</string>
+    <string name="card_width">Width</string>
+    <string name="card_height">Key height</string>
+    <string name="card_digits">Digits</string>
+    <string name="card_letters">Letters</string>
+    <string name="settings_export">Export settings</string>
+    <string name="settings_export_desc">Save the layout and all options to a file</string>
+    <string name="settings_import">Import settings</string>
+    <string name="settings_import_desc">Replace everything with a saved file</string>
+    <string name="export_done">Settings saved</string>
+    <string name="export_failed">Could not save the settings</string>
+    <string name="import_done">Settings loaded</string>
+    <string name="import_failed">That file is not a Lazy9 settings file</string>
+    <string name="drag_remove">Remove</string>
     <string name="settings_card_opacity">Opacity</string>
 
     <string name="widget_unavailable">Widget unavailable</string>
