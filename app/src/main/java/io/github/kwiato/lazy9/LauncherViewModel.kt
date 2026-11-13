@@ -2,7 +2,13 @@ package io.github.kwiato.lazy9
 
 import android.app.Application
 import android.appwidget.AppWidgetProviderInfo
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.LauncherApps
+import androidx.core.content.ContextCompat
+import io.github.kwiato.lazy9.data.PrivateSpace
 import android.os.Build
 import android.os.UserHandle
 import androidx.compose.runtime.getValue
@@ -64,22 +70,46 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         override fun onPackagesUnavailable(names: Array<out String>, user: UserHandle, replacing: Boolean) = reload()
     }
 
+    var privateSpace by mutableStateOf<PrivateSpace?>(null)
+        private set
+
+    // A profile (Private Space, work profile) got locked, unlocked, added or removed.
+    private val profileReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = reload()
+    }
+
     init {
         reload()
         repo.register(packageCallback)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_PROFILE_ADDED)
+            addAction(Intent.ACTION_PROFILE_REMOVED)
+            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+        }
+        ContextCompat.registerReceiver(app, profileReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onCleared() {
         repo.unregister(packageCallback)
+        getApplication<Application>().unregisterReceiver(profileReceiver)
     }
 
     fun reload() {
         viewModelScope.launch {
-            val list = withContext(Dispatchers.Default) { repo.load() }
+            val (list, space) = withContext(Dispatchers.Default) { repo.load() to repo.privateSpace() }
             apps = list
             appsByKey = list.associateBy { it.key }
+            privateSpace = space
             loaded = true
         }
+    }
+
+    fun setPrivateSpaceLocked(locked: Boolean) {
+        val space = privateSpace ?: return
+        repo.setPrivateSpaceLocked(space, locked)
     }
 
     private fun update(transform: (LauncherState) -> LauncherState) {
@@ -97,6 +127,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             return
         }
+        // Nothing about Private Space apps is written to disk.
+        if (app.isPrivate) return
         update { it.copy(usage = it.usage + (app.key to (it.usage[app.key] ?: 0) + 1)) }
     }
 

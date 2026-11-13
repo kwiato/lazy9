@@ -7,6 +7,10 @@
     <!-- "Uninstall" in the app menu. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- Lets the default launcher see the Private Space profile (Android 15+,
+         incl. GrapheneOS) so its apps can be listed once it is unlocked. -->
+    <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />

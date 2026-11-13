@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">Lazy9</string>
 
+    <string name="private_space">Private space</string>
+    <string name="private_unlock">Tap to unlock</string>
+    <string name="private_lock">Lock</string>
+
     <string name="a11y_label">Lazy9 gestures</string>
     <string name="a11y_desc">Lets the launcher turn the screen off on a double tap and open notifications on a swipe down. It does not read anything on the screen.</string>
 

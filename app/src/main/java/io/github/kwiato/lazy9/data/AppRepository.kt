@@ -3,6 +3,7 @@ package io.github.kwiato.lazy9.data
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
+import android.os.Build
 import android.os.UserHandle
 import android.os.UserManager
 import androidx.compose.ui.graphics.asImageBitmap
@@ -23,6 +24,9 @@ class AppRepository(private val context: Context) {
         val out = ArrayList<AppEntry>()
         for (user in userManager.userProfiles) {
             val serial = serialOf(user)
+            val private = isPrivate(user)
+            // A locked Private Space must not leak its apps anywhere.
+            if (private && isLocked(user)) continue
             val activities = try {
                 launcherApps.getActivityList(null, user)
             } catch (e: Exception) {
@@ -44,11 +48,45 @@ class AppRepository(private val context: Context) {
                     user = user,
                     icon = drawable.toBitmap(iconPx, iconPx).asImageBitmap(),
                     t9 = T9.encode(label),
+                    isPrivate = private,
                 )
             }
         }
         val collator = Collator.getInstance()
         return out.sortedWith { a, b -> collator.compare(a.label, b.label) }
+    }
+
+    // ---- Private Space (Android 15+) ----------------------------------------
+
+    private fun isPrivate(user: UserHandle): Boolean {
+        if (Build.VERSION.SDK_INT < 35) return false
+        return try {
+            launcherApps.getLauncherUserInfo(user)?.userType == UserManager.USER_TYPE_PROFILE_PRIVATE
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isLocked(user: UserHandle): Boolean = try {
+        userManager.isQuietModeEnabled(user)
+    } catch (e: Exception) {
+        true
+    }
+
+    /** Null when the device has no Private Space (or we are not the default launcher). */
+    fun privateSpace(): PrivateSpace? {
+        if (Build.VERSION.SDK_INT < 35) return null
+        val user = userManager.userProfiles.firstOrNull { isPrivate(it) } ?: return null
+        return PrivateSpace(user, isLocked(user))
+    }
+
+    /** Locking is immediate; unlocking makes the system ask for the Private Space credentials. */
+    fun setPrivateSpaceLocked(space: PrivateSpace, locked: Boolean) {
+        try {
+            userManager.requestQuietModeEnabled(locked, space.user)
+        } catch (e: Exception) {
+            // only the default launcher may do this
+        }
     }
 
     fun launch(app: AppEntry) {

@@ -15,7 +15,12 @@ class AppEntry(
     val user: UserHandle,
     val icon: ImageBitmap,
     val t9: T9Name,
+    /** Lives in the Private Space profile — only listed while that is unlocked. */
+    val isPrivate: Boolean = false,
 )
+
+/** The device's Private Space profile, if it has one. */
+class PrivateSpace(val user: UserHandle, val locked: Boolean)
 
 /** One thing on a home page: an app shortcut ([appKey]) or a widget ([widgetId]). */
 @Serializable

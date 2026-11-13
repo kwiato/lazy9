@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="private_space">Przestrzeń prywatna</string>
+    <string name="private_unlock">Dotknij, żeby odblokować</string>
+    <string name="private_lock">Zablokuj</string>
+
     <string name="a11y_label">Gesty Lazy9</string>
     <string name="a11y_desc">Pozwala launcherowi wygasić ekran podwójnym tapnięciem i otworzyć powiadomienia przesunięciem w dół. Nie odczytuje niczego z ekranu.</string>
 
