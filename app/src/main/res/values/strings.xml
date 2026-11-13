@@ -48,6 +48,8 @@
     <string name="settings_gestures_off">Tap to switch the accessibility service on</string>
     <string name="settings_autolaunch">Launch a single T9 match</string>
     <string name="settings_autolaunch_desc">Open the app straight away when only one matches</string>
+    <string name="settings_persistent">Persistent search</string>
+    <string name="settings_persistent_desc">Keep the T9 keypad on the home screen, with three apps beside it instead of the dock</string>
 
     <string name="widget_unavailable">Widget unavailable</string>
     <string name="widget_width">Width</string>

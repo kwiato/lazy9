@@ -46,6 +46,8 @@
     <string name="settings_gestures_off">Dotknij, żeby włączyć usługę ułatwień dostępu</string>
     <string name="settings_autolaunch">Uruchamiaj jedyne dopasowanie T9</string>
     <string name="settings_autolaunch_desc">Otwórz aplikację od razu, gdy pasuje tylko jedna</string>
+    <string name="settings_persistent">Stała wyszukiwarka</string>
+    <string name="settings_persistent_desc">Klawiatura T9 na stałe na pulpicie, a obok niej trzy aplikacje zamiast paska</string>
 
     <string name="widget_unavailable">Widżet niedostępny</string>
     <string name="widget_width">Szerokość</string>

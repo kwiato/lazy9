@@ -248,7 +248,7 @@ private fun DrawerApp(
                         onAddToHome(app)
                     },
                 )
-                if (app.key !in vm.state.dock && vm.state.dock.any { it == null || it !in vm.appsByKey }) {
+                if (app.key !in vm.state.dock.take(vm.dockSlots) && vm.dockHasRoom()) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.menu_add_dock)) },
                         leadingIcon = { Icon(Icons.Outlined.PushPin, null) },

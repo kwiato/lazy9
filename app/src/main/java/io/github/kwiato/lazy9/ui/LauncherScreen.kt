@@ -18,6 +18,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Widgets
@@ -50,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -96,12 +100,18 @@ fun LauncherScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var lockHelp by remember { mutableStateOf(false) }
 
+    // Bumped to drop whatever is typed into the persistent keypad: when the
+    // launcher goes to the background (an app was opened) and on HOME.
+    var searchEpoch by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { searchEpoch++ }
+
     // HOME closes whatever is open; pressed on the bare desktop it returns to the first page.
     LaunchedEffect(homeEvent) {
         if (homeEvent.count == 0) return@LaunchedEffect
         val hadOverlay = drawerOpen || searchOpen || widgetsOpen || homeMenu || settingsOpen || lockHelp
         drawerOpen = false; searchOpen = false; widgetsOpen = false
         homeMenu = false; settingsOpen = false; lockHelp = false
+        searchEpoch++
         if (homeEvent.onHome && !hadOverlay) pagerState.animateScrollToPage(0)
     }
 
@@ -160,16 +170,35 @@ fun LauncherScreen(
         ) {
             Workspace(vm, widgets, host, pagerState, Modifier.weight(1f))
             PageDots(count = vm.state.pages, current = pagerState.currentPage)
-            Dock(
-                vm = vm,
-                host = host,
-                onSearch = { searchOpen = true },
-                onSearchPosition = { searchOrigin = it },
-                onPickApp = { slot ->
-                    pickSlot = slot
-                    drawerOpen = true
-                },
-            )
+            val pickApp = { slot: Int ->
+                pickSlot = slot
+                drawerOpen = true
+            }
+            if (vm.state.persistentSearch) {
+                // The keypad lives on the desktop; three apps stand beside it.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                        .padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 8.dp),
+                ) {
+                    T9Panel(vm, Modifier.weight(1f), resetKey = searchEpoch)
+                    SideDock(
+                        vm, host, pickApp,
+                        Modifier
+                            .width(76.dp)
+                            .fillMaxHeight(),
+                    )
+                }
+            } else {
+                Dock(
+                    vm = vm,
+                    host = host,
+                    onSearch = { searchOpen = true },
+                    onSearchPosition = { searchOrigin = it },
+                    onPickApp = pickApp,
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -273,6 +302,17 @@ fun LauncherScreen(
                     stringResource(R.string.settings_autolaunch_desc),
                     trailing = { Switch(checked = vm.state.autoLaunch, onCheckedChange = { vm.setAutoLaunch(it) }) },
                 ) { vm.setAutoLaunch(!vm.state.autoLaunch) }
+                SheetRow(
+                    Icons.Outlined.PushPin,
+                    stringResource(R.string.settings_persistent),
+                    stringResource(R.string.settings_persistent_desc),
+                    trailing = {
+                        Switch(
+                            checked = vm.state.persistentSearch,
+                            onCheckedChange = { vm.setPersistentSearch(it) },
+                        )
+                    },
+                ) { vm.setPersistentSearch(!vm.state.persistentSearch) }
             }
         }
     }

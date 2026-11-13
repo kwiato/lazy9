@@ -74,20 +74,7 @@ fun T9Search(
     reveal: () -> Float,
     onClose: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
     var cardPos by remember { mutableStateOf(Offset.Zero) }
-    val haptic = LocalHapticFeedback.current
-    val matches = remember(query, vm.apps, vm.state.usage) { vm.search(query) }
-    val shown = matches.take(MAX_RESULTS)
-
-    if (vm.state.autoLaunch) {
-        LaunchedEffect(matches) {
-            if (query.length >= 2 && matches.size == 1) {
-                vm.launch(matches[0])
-                onClose()
-            }
-        }
-    }
 
     Box(Modifier.fillMaxSize()) {
         // Tapping the wallpaper above the panel dismisses it.
@@ -101,8 +88,9 @@ fun T9Search(
                     onClick = onClose,
                 ),
         )
-        Column(
-            Modifier
+        T9Panel(
+            vm,
+            modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(start = 28.dp, end = 28.dp, bottom = 16.dp)
@@ -125,65 +113,100 @@ fun T9Search(
                         val circle = Path().apply { addOval(Rect(c, reach * progress)) }
                         clipPath(circle) { this@drawWithContent.drawContent() }
                     }
-                }
-                .clip(RoundedCornerShape(32.dp))
-                .background(CardColor)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                )
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                },
+            onLaunched = onClose,
+        )
+    }
+}
+
+/**
+ * Results on top, the keypad under the thumb. Used both inside the pop-up
+ * card and, with "persistent search" on, fixed on the home screen.
+ *
+ * @param resetKey the typed query is dropped whenever this changes.
+ */
+@Composable
+fun T9Panel(
+    vm: LauncherViewModel,
+    modifier: Modifier = Modifier,
+    resetKey: Any? = null,
+    onLaunched: () -> Unit = {},
+) {
+    var query by remember(resetKey) { mutableStateOf("") }
+    val haptic = LocalHapticFeedback.current
+    val matches = remember(query, vm.apps, vm.state.usage) { vm.search(query) }
+    val shown = matches.take(MAX_RESULTS)
+
+    if (vm.state.autoLaunch) {
+        LaunchedEffect(matches) {
+            if (query.length >= 2 && matches.size == 1) {
+                vm.launch(matches[0])
+                onLaunched()
+            }
+        }
+    }
+
+    Column(
+        modifier
+            .clip(RoundedCornerShape(32.dp))
+            .background(CardColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            )
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Results: up to three icons, best match first, centred when fewer.
+        // Deliberately bare: no typed digits, no labels, no hint.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(80.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            // Results: up to three icons, best match first, centred when fewer.
-            // Deliberately bare: no typed digits, no labels, no hint.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (shown.isEmpty()) {
-                    if (query.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.t9_no_results),
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
+            if (shown.isEmpty()) {
+                if (query.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.t9_no_results),
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.Center) {
+                    for (app in shown) {
+                        AppIcon(
+                            app,
+                            Modifier
+                                // Shrinks on narrow panels (the persistent one).
+                                .weight(1f, fill = false)
+                                .width(88.dp)
+                                .height(80.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable {
+                                    vm.launch(app)
+                                    onLaunched()
+                                },
+                            showLabel = false,
+                            iconSize = 56.dp,
                         )
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.Center) {
-                        for (app in shown) {
-                            AppIcon(
-                                app,
-                                Modifier
-                                    .width(88.dp)
-                                    .height(80.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .clickable {
-                                        vm.launch(app)
-                                        onClose()
-                                    },
-                                showLabel = false,
-                                iconSize = 56.dp,
-                            )
-                        }
                     }
                 }
             }
+        }
 
-            for (row in KEYS.chunked(3)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((digit, letters) in row) {
-                        Key(onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            // 1 carries no letters, so it clears the search instead.
-                            if (digit == "1") query = "" else query += digit
-                        }) {
-                            if (digit == "1") ClearKeyLabel() else KeyLabel(digit, letters)
-                        }
+        for (row in KEYS.chunked(3)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((digit, letters) in row) {
+                    Key(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        // 1 carries no letters, so it clears the search instead.
+                        if (digit == "1") query = "" else query += digit
+                    }) {
+                        if (digit == "1") ClearKeyLabel() else KeyLabel(digit, letters)
                     }
                 }
             }

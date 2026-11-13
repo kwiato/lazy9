@@ -150,6 +150,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAutoLaunch(on: Boolean) = update { it.copy(autoLaunch = on) }
 
+    fun setPersistentSearch(on: Boolean) = update { it.copy(persistentSearch = on) }
+
+    /** Dock slots on screen: the column beside the persistent keypad only fits three. */
+    val dockSlots: Int get() = if (state.persistentSearch) 3 else state.dock.size
+
+    private fun freeDockSlot(): Int =
+        state.dock.take(dockSlots).indexOfFirst { it == null || (loaded && it !in appsByKey) }
+
+    fun dockHasRoom(): Boolean = freeDockSlot() >= 0
+
     // ---- dock ---------------------------------------------------------------
 
     fun setDock(slot: Int, key: String?) = update { s ->
@@ -165,8 +175,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Returns false when the dock is full. */
     fun addToDock(key: String): Boolean {
-        if (key in state.dock) return true
-        val slot = state.dock.indexOfFirst { it == null || (loaded && it !in appsByKey) }
+        if (key in state.dock.take(dockSlots)) return true
+        val slot = freeDockSlot()
         if (slot < 0) return false
         setDock(slot, key)
         return true

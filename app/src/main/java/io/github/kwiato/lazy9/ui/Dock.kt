@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,7 +58,6 @@ fun Dock(
     onPickApp: (slot: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haptic = LocalHapticFeedback.current
     Row(
         modifier
             .fillMaxWidth()
@@ -91,56 +91,7 @@ fun Dock(
                         )
                     }
                 } else {
-                    val app = vm.state.dock.getOrNull(slot)?.let { vm.appsByKey[it] }
-                    if (app != null) {
-                        var menu by remember { mutableStateOf(false) }
-                        AppIcon(
-                            app,
-                            Modifier.combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { vm.launch(app) },
-                                onLongClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    menu = true
-                                },
-                            ),
-                            showLabel = false,
-                            iconSize = 54.dp,
-                        )
-                        AppMenu(menu, { menu = false }, app, vm, host) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_replace_dock)) },
-                                leadingIcon = { Icon(Icons.Outlined.SwapHoriz, null) },
-                                onClick = {
-                                    menu = false
-                                    onPickApp(slot)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_remove_dock)) },
-                                leadingIcon = { Icon(Icons.Outlined.Close, null) },
-                                onClick = {
-                                    menu = false
-                                    vm.setDock(slot, null)
-                                },
-                            )
-                        }
-                    } else if (vm.loaded) {
-                        // An empty slot draws nothing; holding it picks an app.
-                        val label = stringResource(R.string.dock_empty)
-                        Box(
-                            Modifier
-                                .size(54.dp)
-                                .semantics { contentDescription = label }
-                                .pointerInput(slot) {
-                                    detectTapGestures(onLongPress = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onPickApp(slot)
-                                    })
-                                },
-                        )
-                    }
+                    DockSlot(vm, host, slot, onPickApp)
                 }
             }
         }
@@ -148,3 +99,87 @@ fun Dock(
 }
 
 private const val SEARCH = -1
+
+/** The column of three apps beside the persistent T9 keypad. */
+@Composable
+fun SideDock(
+    vm: LauncherViewModel,
+    host: LauncherHost,
+    onPickApp: (slot: Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        for (slot in 0 until 3) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                DockSlot(vm, host, slot, onPickApp)
+            }
+        }
+    }
+}
+
+/** One dock app with its menu, or — when empty — an invisible spot to hold. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DockSlot(
+    vm: LauncherViewModel,
+    host: LauncherHost,
+    slot: Int,
+    onPickApp: (slot: Int) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val app = vm.state.dock.getOrNull(slot)?.let { vm.appsByKey[it] }
+    if (app != null) {
+        var menu by remember { mutableStateOf(false) }
+        AppIcon(
+            app,
+            Modifier.combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { vm.launch(app) },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu = true
+                },
+            ),
+            showLabel = false,
+            iconSize = 54.dp,
+        )
+        AppMenu(menu, { menu = false }, app, vm, host) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.menu_replace_dock)) },
+                leadingIcon = { Icon(Icons.Outlined.SwapHoriz, null) },
+                onClick = {
+                    menu = false
+                    onPickApp(slot)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.menu_remove_dock)) },
+                leadingIcon = { Icon(Icons.Outlined.Close, null) },
+                onClick = {
+                    menu = false
+                    vm.setDock(slot, null)
+                },
+            )
+        }
+    } else if (vm.loaded) {
+        // An empty slot draws nothing; holding it picks an app.
+        val label = stringResource(R.string.dock_empty)
+        Box(
+            Modifier
+                .size(54.dp)
+                .semantics { contentDescription = label }
+                .pointerInput(slot) {
+                    detectTapGestures(onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPickApp(slot)
+                    })
+                },
+        )
+    }
+}
