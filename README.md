@@ -21,7 +21,8 @@ A minimalist Android launcher built around T9 app search.
   - *T9 card background*: colour and opacity.
   - *Monochrome icons*: one-colour icons in the wallpaper palette.
   - *Favourite contacts in T9*: starred contacts show up in the results; tap
-    one to call. Needs the contacts and phone permissions, asked for only when
+    one to call, hold it for SMS and whatever your messengers (Signal,
+    WhatsApp, Telegram, …) offer for that contact. Needs the contacts and phone permissions, asked for only when
     you switch it on. Contacts stay in memory — nothing is stored or sent.
 
 ## Build

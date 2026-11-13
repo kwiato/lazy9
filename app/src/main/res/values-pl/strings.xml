@@ -47,7 +47,8 @@
     <string name="settings_autolaunch">Uruchamiaj jedyne dopasowanie T9</string>
     <string name="settings_autolaunch_desc">Otwórz aplikację od razu, gdy pasuje tylko jedna</string>
     <string name="settings_contacts">Ulubione kontakty w T9</string>
-    <string name="settings_contacts_desc">Kontakty oznaczone gwiazdką pojawiają się w wynikach; dotknij, żeby zadzwonić</string>
+    <string name="settings_contacts_desc">Kontakty z gwiazdką pojawiają się w wynikach; dotknij, żeby zadzwonić, przytrzymaj, żeby napisać</string>
+    <string name="t9_sms">SMS</string>
     <string name="t9_call">Zadzwoń</string>
     <string name="settings_persistent">Stała wyszukiwarka</string>
     <string name="settings_persistent_desc">Klawiatura T9 na stałe na pulpicie, a obok niej trzy aplikacje zamiast paska</string>

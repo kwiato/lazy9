@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import io.github.kwiato.lazy9.data.AppEntry
+import io.github.kwiato.lazy9.data.ContactAction
 import io.github.kwiato.lazy9.data.ContactEntry
 import io.github.kwiato.lazy9.ui.LauncherScreen
 import io.github.kwiato.lazy9.ui.LauncherTheme
@@ -49,6 +50,12 @@ interface LauncherHost {
 
     /** Calls straight away, or opens the dialer with the number if calling was not allowed. */
     fun call(contact: ContactEntry)
+
+    /** Opens the SMS app on a conversation with the contact. */
+    fun sms(contact: ContactEntry)
+
+    /** Runs a messenger's own action for a contact (message, call, …). */
+    fun contactAction(action: ContactAction)
 }
 
 /** Owns the AppWidgetHost and one host view per placed widget. */
@@ -106,6 +113,11 @@ class MainActivity : ComponentActivity(), LauncherHost {
         val action = if (vm.contactRepo.canCall()) Intent.ACTION_CALL else Intent.ACTION_DIAL
         tryStart(Intent(action, Uri.fromParts("tel", contact.number, null)))
     }
+
+    override fun sms(contact: ContactEntry) =
+        tryStart(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", contact.number, null)))
+
+    override fun contactAction(action: ContactAction) = tryStart(action.intent())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(

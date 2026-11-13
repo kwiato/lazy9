@@ -49,7 +49,8 @@
     <string name="settings_autolaunch">Launch a single T9 match</string>
     <string name="settings_autolaunch_desc">Open the app straight away when only one matches</string>
     <string name="settings_contacts">Favourite contacts in T9</string>
-    <string name="settings_contacts_desc">Starred contacts appear in the results; tap one to call</string>
+    <string name="settings_contacts_desc">Starred contacts appear in the results; tap one to call, hold for messages</string>
+    <string name="t9_sms">SMS</string>
     <string name="t9_call">Call</string>
     <string name="settings_persistent">Persistent search</string>
     <string name="settings_persistent_desc">Keep the T9 keypad on the home screen, with three apps beside it instead of the dock</string>

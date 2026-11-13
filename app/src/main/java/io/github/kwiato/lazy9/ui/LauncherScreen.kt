@@ -192,7 +192,7 @@ fun LauncherScreen(
                         .height(IntrinsicSize.Min)
                         .padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
-                    T9Panel(vm, Modifier.weight(1f), resetKey = searchEpoch, onCall = host::call)
+                    T9Panel(vm, host, Modifier.weight(1f), resetKey = searchEpoch)
                     SideDock(
                         vm, host, pickApp,
                         Modifier
@@ -254,7 +254,7 @@ fun LauncherScreen(
                 transitionSpec = { tween(if (targetState == EnterExitState.Visible) 340 else 220) },
                 label = "t9 reveal",
             ) { if (it == EnterExitState.Visible) 1f else 0f }
-            T9Search(vm, origin = searchOrigin, reveal = { reveal }, onCall = host::call) { searchOpen = false }
+            T9Search(vm, origin = searchOrigin, reveal = { reveal }, host = host) { searchOpen = false }
         }
     }
 

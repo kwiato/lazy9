@@ -1,11 +1,14 @@
 package io.github.kwiato.lazy9.data
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract.CommonDataKinds.Phone
+import android.provider.ContactsContract.Data
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -59,6 +62,41 @@ class ContactRepository(private val context: Context) {
         return out.values.toList()
     }
 
+    /**
+     * What other apps offer for this contact. Messengers (Signal, WhatsApp,
+     * Telegram, …) add their own rows to a contact — "Message +48…", "Voice
+     * call…" — each opened by viewing that row. Only rows some installed app
+     * actually handles are returned.
+     */
+    fun actions(contact: ContactEntry): List<ContactAction> {
+        if (!canRead()) return emptyList()
+        val out = ArrayList<ContactAction>()
+        val seen = HashSet<String>()
+        val pm = context.packageManager
+        try {
+            context.contentResolver.query(
+                Data.CONTENT_URI,
+                arrayOf(Data._ID, Data.MIMETYPE, Data.DATA3),
+                "${Data.CONTACT_ID} = ? AND ${Data.MIMETYPE} LIKE 'vnd.android.cursor.item/vnd.%'",
+                arrayOf(contact.id.toString()),
+                null,
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val mime = c.getString(1) ?: continue
+                    if (!seen.add(mime)) continue
+                    val action = ContactAction(c.getLong(0), mime, "", "")
+                    val handler = pm.resolveActivity(action.intent(), 0)?.activityInfo ?: continue
+                    val label = c.getString(2)?.trim().orEmpty()
+                        .ifEmpty { handler.applicationInfo.loadLabel(pm).toString() }
+                    out += ContactAction(action.dataId, mime, label, handler.packageName)
+                }
+            }
+        } catch (e: Exception) {
+            // same as favorites(): treat as "nothing on offer"
+        }
+        return out.sortedBy { it.pkg }
+    }
+
     private fun photo(uri: String?): ImageBitmap? {
         if (uri == null) return null
         return try {
@@ -69,6 +107,13 @@ class ContactRepository(private val context: Context) {
             null
         }
     }
+}
+
+/** Something another app can do with a contact; see [ContactRepository.actions]. */
+class ContactAction(val dataId: Long, val mime: String, val label: String, val pkg: String) {
+    fun intent(): Intent = Intent(Intent.ACTION_VIEW)
+        .setDataAndType(ContentUris.withAppendedId(Data.CONTENT_URI, dataId), mime)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }
 
 /** One T9 result: an app to open or a favourite contact to call. */

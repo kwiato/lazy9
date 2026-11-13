@@ -24,14 +24,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.automirrored.outlined.Backspace
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,9 +63,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.kwiato.lazy9.LauncherHost
 import io.github.kwiato.lazy9.LauncherViewModel
 import io.github.kwiato.lazy9.R
+import io.github.kwiato.lazy9.data.ContactAction
 import io.github.kwiato.lazy9.data.ContactEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.github.kwiato.lazy9.data.Hit
 
 private const val MAX_RESULTS = 3
@@ -79,7 +89,7 @@ fun T9Search(
     origin: Offset,
     /** 0..1: how far the circular reveal has spread. Read while drawing only. */
     reveal: () -> Float,
-    onCall: (ContactEntry) -> Unit,
+    host: LauncherHost,
     onClose: () -> Unit,
 ) {
     var cardPos by remember { mutableStateOf(Offset.Zero) }
@@ -98,6 +108,7 @@ fun T9Search(
         )
         T9Panel(
             vm,
+            host,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -122,7 +133,6 @@ fun T9Search(
                         clipPath(circle) { this@drawWithContent.drawContent() }
                     }
                 },
-            onCall = onCall,
             onLaunched = onClose,
         )
     }
@@ -137,9 +147,9 @@ fun T9Search(
 @Composable
 fun T9Panel(
     vm: LauncherViewModel,
+    host: LauncherHost,
     modifier: Modifier = Modifier,
     resetKey: Any? = null,
-    onCall: (ContactEntry) -> Unit = {},
     onLaunched: () -> Unit = {},
 ) {
     var query by remember(resetKey) { mutableStateOf("") }
@@ -212,13 +222,7 @@ fun T9Panel(
                                 showLabel = false,
                                 iconSize = 56.dp,
                             )
-                            is Hit.Contact -> ContactResult(
-                                hit.contact,
-                                cell.clickable {
-                                    onCall(hit.contact)
-                                    onLaunched()
-                                },
-                            )
+                            is Hit.Contact -> ContactResult(hit.contact, vm, host, onLaunched, cell)
                         }
                     }
                 }
@@ -245,12 +249,35 @@ fun T9Panel(
 /**
  * A favourite contact among the results: photo or initial, a small handset
  * badge, and the first name — unlike app icons, faces need a caption.
+ * A tap calls; holding offers SMS and whatever messengers provide.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContactResult(contact: ContactEntry, modifier: Modifier = Modifier) {
+private fun ContactResult(
+    contact: ContactEntry,
+    vm: LauncherViewModel,
+    host: LauncherHost,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val ink = LocalContentColor.current
+    val haptic = LocalHapticFeedback.current
+    var menu by remember { mutableStateOf(false) }
+    Box(modifier, contentAlignment = Alignment.Center) {
+    ContactMenu(menu, { menu = false }, contact, vm, host, onDone)
     Column(
-        modifier,
+        Modifier
+            .fillMaxSize()
+            .combinedClickable(
+                onClick = {
+                    host.call(contact)
+                    onDone()
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu = true
+                },
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -301,6 +328,57 @@ private fun ContactResult(contact: ContactEntry, modifier: Modifier = Modifier) 
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
         )
+    }
+    }
+}
+
+/** Ways to reach a contact: call, SMS, then each messenger's own entries. */
+@Composable
+private fun ContactMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    contact: ContactEntry,
+    vm: LauncherViewModel,
+    host: LauncherHost,
+    onDone: () -> Unit,
+) {
+    if (!expanded) return
+    val actions by produceState(emptyList<ContactAction>(), contact) {
+        value = withContext(Dispatchers.IO) { vm.contactRepo.actions(contact) }
+    }
+    val pick = { run: () -> Unit ->
+        onDismiss()
+        run()
+        onDone()
+    }
+    // The menu is always on Material's own surface, whatever the card's ink is.
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.t9_call)) },
+                leadingIcon = { Icon(Icons.Filled.Call, null) },
+                onClick = { pick { host.call(contact) } },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.t9_sms)) },
+                leadingIcon = { Icon(Icons.Outlined.Sms, null) },
+                onClick = { pick { host.sms(contact) } },
+            )
+            for (action in actions) {
+                val app = remember(action.pkg, vm.apps) { vm.apps.firstOrNull { it.component.packageName == action.pkg } }
+                DropdownMenuItem(
+                    text = { Text(action.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = {
+                        if (app != null) {
+                            Image(app.icon, contentDescription = app.label, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.AutoMirrored.Outlined.Send, null)
+                        }
+                    },
+                    onClick = { pick { host.contactAction(action) } },
+                )
+            }
+        }
     }
 }
 
