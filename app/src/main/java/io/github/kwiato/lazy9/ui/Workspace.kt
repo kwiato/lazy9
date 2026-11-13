@@ -47,6 +47,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -77,6 +78,7 @@ fun Workspace(
     widgets: WidgetController,
     host: LauncherHost,
     pagerState: PagerState,
+    dnd: DragDrop,
     modifier: Modifier = Modifier,
 ) {
     val state = vm.state
@@ -100,6 +102,22 @@ fun Workspace(
             vm.cellHpx = cellHpx
         }
 
+        SideEffect {
+            dnd.cellAt = { root ->
+                val ws = wsCoords
+                if (ws == null || !ws.isAttached) {
+                    null
+                } else {
+                    val p = root - ws.positionInRoot()
+                    if (p.x < 0f || p.y < 0f || p.x >= ws.size.width || p.y >= ws.size.height) null
+                    else IntOffset(
+                        (p.x / cellWpx).toInt().coerceIn(0, state.cols - 1),
+                        (p.y / cellHpx).toInt().coerceIn(0, state.rows - 1),
+                    )
+                }
+            }
+        }
+
         fun targetCell(d: DragInfo, item: HomeItem): IntOffset {
             val topLeft = d.pointer - d.grab
             return IntOffset(
@@ -110,15 +128,22 @@ fun Workspace(
 
         // While dragging: resting at a side edge flips to the neighbouring page
         // (and grows a new page past the last one).
-        LaunchedEffect(drag) {
+        LaunchedEffect(drag, dnd.app) {
             var atEdgeMs = 0
-            while (drag != null) {
+            while (drag != null || dnd.app != null) {
                 delay(50)
-                val d = drag ?: break
+                val d = drag
+                // How far across the desktop the finger is; null while nothing has moved.
+                val x = when {
+                    d != null -> if (d.moved) d.pointer.x else null
+                    dnd.app != null ->
+                        wsCoords?.takeIf { it.isAttached }?.let { dnd.pointer.x - it.positionInRoot().x }
+                    else -> break
+                }
                 val dir = when {
-                    !d.moved -> 0
-                    d.pointer.x < edgePx -> -1
-                    d.pointer.x > widthPx - edgePx -> 1
+                    x == null || dnd.hoverSlot != null -> 0
+                    x < edgePx -> -1
+                    x > widthPx - edgePx -> 1
                     else -> 0
                 }
                 if (dir == 0) {
@@ -179,15 +204,25 @@ fun Workspace(
                                                         cur.moved = true
                                                         menuId = null
                                                     }
+                                                    // Apps (not widgets) can be dropped on the dock.
+                                                    val isApp = vm.state.items.find { it.id == cur.itemId }?.appKey != null
+                                                    dnd.hoverSlot =
+                                                        if (cur.moved && isApp) dnd.slotAt(ws.localToRoot(cur.pointer)) else null
                                                 }
                                             },
                                             onEnd = {
                                                 val cur = drag
+                                                val slot = dnd.hoverSlot
                                                 drag = null
+                                                dnd.hoverSlot = null
                                                 val dropped = vm.state.items.find { it.id == cur?.itemId }
                                                 if (cur != null && cur.moved && dropped != null) {
-                                                    val cell = targetCell(cur, dropped)
-                                                    vm.moveItem(dropped.id, pagerState.currentPage, cell.x, cell.y)
+                                                    if (slot != null && dropped.appKey != null) {
+                                                        vm.moveItemToDock(dropped.id, slot)
+                                                    } else {
+                                                        val cell = targetCell(cur, dropped)
+                                                        vm.moveItem(dropped.id, pagerState.currentPage, cell.x, cell.y)
+                                                    }
                                                 }
                                             },
                                         )
@@ -242,6 +277,25 @@ fun Workspace(
             }
         }
 
+        // An app dragged out of the drawer: outline the cell it would land on.
+        if (dnd.app != null && dnd.hoverSlot == null) {
+            val cell = dnd.cellAt?.invoke(dnd.pointer)
+            if (cell != null) {
+                val fits = vm.canPlace(null, pagerState.currentPage, cell.x, cell.y, 1, 1)
+                Box(
+                    Modifier
+                        .offset(cellW * cell.x, cellH * cell.y)
+                        .size(cellW, cellH)
+                        .padding(4.dp)
+                        .border(
+                            2.dp,
+                            if (fits) Color.White.copy(alpha = 0.75f) else Color(0xFFFF6B6B).copy(alpha = 0.85f),
+                            RoundedCornerShape(18.dp),
+                        ),
+                )
+            }
+        }
+
         // The lifted item follows the finger; an outline shows where it would land.
         val d = drag
         val item = if (d != null && d.moved) state.items.find { it.id == d.itemId } else null
@@ -249,7 +303,7 @@ fun Workspace(
             val cell = targetCell(d, item)
             val fits = vm.canPlace(item.id, pagerState.currentPage, cell.x, cell.y, item.spanX, item.spanY)
             val shape = RoundedCornerShape(18.dp)
-            Box(
+            if (dnd.hoverSlot == null) Box(
                 Modifier
                     .offset(cellW * cell.x, cellH * cell.y)
                     .size(cellW * item.spanX, cellH * item.spanY)

@@ -2,6 +2,7 @@ package io.github.kwiato.lazy9.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,6 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +59,7 @@ fun Dock(
     onSearch: () -> Unit,
     onSearchPosition: (Offset) -> Unit,
     onPickApp: (slot: Int) -> Unit,
+    dnd: DragDrop,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -91,7 +95,7 @@ fun Dock(
                         )
                     }
                 } else {
-                    DockSlot(vm, host, slot, onPickApp)
+                    DockSlot(vm, host, slot, onPickApp, dnd)
                 }
             }
         }
@@ -106,6 +110,7 @@ fun SideDock(
     vm: LauncherViewModel,
     host: LauncherHost,
     onPickApp: (slot: Int) -> Unit,
+    dnd: DragDrop,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -116,7 +121,7 @@ fun SideDock(
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                DockSlot(vm, host, slot, onPickApp)
+                DockSlot(vm, host, slot, onPickApp, dnd)
             }
         }
     }
@@ -130,8 +135,24 @@ private fun DockSlot(
     host: LauncherHost,
     slot: Int,
     onPickApp: (slot: Int) -> Unit,
+    dnd: DragDrop,
 ) {
     val haptic = LocalHapticFeedback.current
+    // The slot reports where it is, so icons dragged over it can be dropped in.
+    DisposableEffect(slot) { onDispose { dnd.slots.remove(slot) } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { dnd.slots[slot] = it.boundsInRoot() },
+        contentAlignment = Alignment.Center,
+    ) {
+    if (dnd.hoverSlot == slot) {
+        Box(
+            Modifier
+                .size(66.dp)
+                .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+        )
+    }
     val app = vm.state.dock.getOrNull(slot)?.let { vm.appsByKey[it] }
     if (app != null) {
         var menu by remember { mutableStateOf(false) }
@@ -182,4 +203,5 @@ private fun DockSlot(
                 },
         )
     }
+}
 }

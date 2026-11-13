@@ -282,6 +282,38 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun addWidget(widgetId: Int, spanX: Int, spanY: Int, fromPage: Int): Int =
         add(fromPage, spanX, spanY) { id, page, x, y -> HomeItem(id, page, x, y, widgetId = widgetId) }
 
+    /** Puts an app on one exact cell; false when that cell is taken. */
+    fun addAppAt(key: String, page: Int, x: Int, y: Int): Boolean {
+        if (!canPlace(null, page, x, y, 1, 1)) return false
+        update { s ->
+            s.copy(items = s.items + HomeItem(s.nextId, page, x, y, appKey = key), nextId = s.nextId + 1)
+        }
+        return true
+    }
+
+    /**
+     * A desktop icon dropped on a dock slot moves there. The app that was in
+     * the slot, if any, takes the icon's place on the desktop.
+     */
+    fun moveItemToDock(id: Long, slot: Int) {
+        val key = state.items.find { it.id == id }?.appKey ?: return
+        if (slot !in state.dock.indices) return
+        val displaced = state.dock[slot]?.takeIf { it != key && it in appsByKey }
+        update { s ->
+            s.copy(
+                dock = s.dock.mapIndexed { i, old ->
+                    when {
+                        i == slot -> key
+                        old == key -> null
+                        else -> old
+                    }
+                },
+                items = if (displaced != null) s.items.map { if (it.id == id) it.copy(appKey = displaced) else it }
+                else s.items.filterNot { it.id == id },
+            )
+        }
+    }
+
     fun moveItem(id: Long, page: Int, x: Int, y: Int): Boolean {
         val item = state.items.find { it.id == id } ?: return false
         if (!canPlace(id, page, x, y, item.spanX, item.spanY)) return false

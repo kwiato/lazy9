@@ -1,5 +1,11 @@
 package io.github.kwiato.lazy9.ui
 
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.IntOffset
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -131,6 +137,27 @@ fun AppMenu(
             },
         )
     }
+}
+
+/**
+ * Drag-and-drop shared by the desktop, the dock and the app drawer. All
+ * positions are in root (window) coordinates.
+ */
+class DragDrop {
+    /** Where each dock slot currently is on screen. */
+    val slots = mutableStateMapOf<Int, Rect>()
+
+    /** The dock slot under the finger while something droppable is dragged. */
+    var hoverSlot by mutableStateOf<Int?>(null)
+
+    /** An app being dragged out of the drawer, and where the finger is. */
+    var app by mutableStateOf<AppEntry?>(null)
+    var pointer by mutableStateOf(Offset.Zero)
+
+    /** Desktop cell under a point, or null outside the desktop. Set by the workspace. */
+    var cellAt: ((Offset) -> IntOffset?)? = null
+
+    fun slotAt(p: Offset): Int? = slots.entries.firstOrNull { it.value.contains(p) }?.key
 }
 
 /**

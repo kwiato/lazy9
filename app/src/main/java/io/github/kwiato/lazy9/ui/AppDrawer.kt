@@ -46,6 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -81,15 +84,41 @@ fun AppDrawer(
     active: Boolean,
     onClose: () -> Unit,
     onAddToHome: (AppEntry) -> Unit,
+    dnd: DragDrop,
+    /** An app dragged out of the drawer was let go; [dnd] says what and where. */
+    onDrop: () -> Unit,
 ) {
     val close by rememberUpdatedState(onClose)
+    val drop by rememberUpdatedState(onDrop)
+    // Dragging an app out makes the drawer vanish at once, but it has to stay
+    // composed until the finger lifts or the gesture would die with it.
+    var hidden by remember { mutableStateOf(false) }
+    val drawerDrag = remember(dnd) {
+        DrawerDrag(
+            onStart = { app, p ->
+                hidden = true
+                dnd.pointer = p
+                dnd.app = app
+            },
+            onMove = { p ->
+                dnd.pointer = p
+                dnd.hoverSlot = dnd.slotAt(p)
+            },
+            onEnd = { drop() },
+        )
+    }
     val flickPx = with(LocalDensity.current) { 900.dp.toPx() }
     var height by remember { mutableFloatStateOf(0f) }
     var pull by remember { mutableFloatStateOf(0f) } // how far the drawer is dragged down, px
 
     // Reopened before the closing animation finished: this instance is reused,
     // so it must not come back still dragged off-screen.
-    LaunchedEffect(active) { if (active) pull = 0f }
+    LaunchedEffect(active) {
+        if (active) {
+            pull = 0f
+            hidden = false
+        }
+    }
 
     val dragToClose = remember {
         object : NestedScrollConnection {
@@ -131,6 +160,7 @@ fun AppDrawer(
             .fillMaxSize()
             .onSizeChanged { height = it.height.toFloat() }
             .offset { IntOffset(0, pull.roundToInt()) }
+            .graphicsLayer { alpha = if (hidden) 0f else 1f }
             .background(ScrimColor)
             .pointerInput(Unit) {} // touches never fall through to the desktop underneath
             .systemBarsPadding(),
@@ -151,7 +181,7 @@ fun AppDrawer(
                 .nestedScroll(dragToClose),
         ) {
             items(regular, key = { it.key }) { app ->
-                DrawerApp(app, vm, host, pickForSlot, onClose, onAddToHome)
+                DrawerApp(app, vm, host, pickForSlot, onClose, onAddToHome, drawerDrag.takeIf { pickForSlot == null })
             }
 
             // Private Space: a lockable section at the end. Never offered for the dock.
@@ -161,7 +191,7 @@ fun AppDrawer(
                 }
                 if (!space.locked) {
                     items(private, key = { it.key }) { app ->
-                        DrawerApp(app, vm, host, null, onClose, onAddToHome)
+                        DrawerApp(app, vm, host, null, onClose, onAddToHome, null)
                     }
                 }
             }
@@ -201,6 +231,18 @@ private fun PrivateSpaceHeader(locked: Boolean, onToggle: () -> Unit) {
     }
 }
 
+/** Callbacks for dragging an app out of the drawer; positions in root coordinates. */
+private class DrawerDrag(
+    val onStart: (AppEntry, Offset) -> Unit,
+    val onMove: (Offset) -> Unit,
+    val onEnd: () -> Unit,
+)
+
+/**
+ * @param drag when set, holding the icon opens its menu and moving on from
+ *        there drags the app out onto the desktop or dock. Without it the
+ *        icon can only be held for the menu.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DrawerApp(
@@ -210,30 +252,67 @@ private fun DrawerApp(
     pickForSlot: Int?,
     onClose: () -> Unit,
     onAddToHome: (AppEntry) -> Unit,
+    drag: DrawerDrag?,
 ) {
     val haptic = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val tap = {
+        if (pickForSlot != null) vm.setDock(pickForSlot, app.key) else vm.launch(app)
+        onClose()
+    }
     Box(
         Modifier
             .fillMaxWidth()
-            .height(100.dp),
+            .height(100.dp)
+            .onGloballyPositioned { coords = it }
+            .then(
+                if (drag == null) Modifier else Modifier.pointerInput(app.key) {
+                    var start = Offset.Zero
+                    var dragging = false
+                    detectLongPressDrag(
+                        onStart = { pos ->
+                            start = pos
+                            dragging = false
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menu = true
+                        },
+                        onDrag = { change ->
+                            val c = coords
+                            if (c != null && c.isAttached) {
+                                val root = c.localToRoot(change.position)
+                                if (!dragging && (change.position - start).getDistance() > viewConfiguration.touchSlop) {
+                                    dragging = true
+                                    menu = false
+                                    drag.onStart(app, root)
+                                }
+                                if (dragging) drag.onMove(root)
+                            }
+                        },
+                        onEnd = {
+                            if (dragging) drag.onEnd()
+                            dragging = false
+                        },
+                    )
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AppIcon(
             app,
             Modifier
                 .fillMaxSize()
-                .combinedClickable(
-                    onClick = {
-                        if (pickForSlot != null) vm.setDock(pickForSlot, app.key) else vm.launch(app)
-                        onClose()
-                    },
-                    onLongClick = if (pickForSlot != null) null else {
-                        {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menu = true
-                        }
-                    },
+                .then(
+                    if (drag != null) Modifier.clickable(onClick = tap)
+                    else Modifier.combinedClickable(
+                        onClick = tap,
+                        onLongClick = if (pickForSlot != null) null else {
+                            {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                menu = true
+                            }
+                        },
+                    ),
                 ),
         )
         AppMenu(menu, { menu = false }, app, vm, host) {

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -75,6 +76,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -109,6 +111,7 @@ fun LauncherScreen(
     var homeMenu by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var lockHelp by remember { mutableStateOf(false) }
+    val dnd = remember { DragDrop() }
 
     // Bumped to drop whatever is typed into the persistent keypad: when the
     // launcher goes to the background (an app was opened) and on HOME.
@@ -178,7 +181,7 @@ fun LauncherScreen(
                 }
                 .systemBarsPadding(),
         ) {
-            Workspace(vm, widgets, host, pagerState, Modifier.weight(1f))
+            Workspace(vm, widgets, host, pagerState, dnd, Modifier.weight(1f))
             PageDots(count = vm.state.pages, current = pagerState.currentPage)
             val pickApp = { slot: Int ->
                 pickSlot = slot
@@ -194,7 +197,7 @@ fun LauncherScreen(
                 ) {
                     T9Panel(vm, host, Modifier.weight(1f), resetKey = searchEpoch)
                     SideDock(
-                        vm, host, pickApp,
+                        vm, host, pickApp, dnd,
                         Modifier
                             .width(76.dp)
                             .fillMaxHeight(),
@@ -207,6 +210,7 @@ fun LauncherScreen(
                     onSearch = { searchOpen = true },
                     onSearchPosition = { searchOrigin = it },
                     onPickApp = pickApp,
+                    dnd = dnd,
                 )
             }
         }
@@ -228,6 +232,20 @@ fun LauncherScreen(
                     val page = vm.addApp(app.key, pagerState.currentPage)
                     drawerOpen = false
                     scope.launch { pagerState.animateScrollToPage(page) }
+                },
+                dnd = dnd,
+                onDrop = {
+                    // Onto a dock slot, or onto the desktop cell under the finger if it is free.
+                    val app = dnd.app
+                    val slot = dnd.hoverSlot
+                    val cell = dnd.cellAt?.invoke(dnd.pointer)
+                    dnd.app = null
+                    dnd.hoverSlot = null
+                    drawerOpen = false
+                    if (app != null) {
+                        if (slot != null) vm.setDock(slot, app.key)
+                        else if (cell != null) vm.addAppAt(app.key, pagerState.currentPage, cell.x, cell.y)
+                    }
                 },
             )
         }
@@ -255,6 +273,21 @@ fun LauncherScreen(
                 label = "t9 reveal",
             ) { if (it == EnterExitState.Visible) 1f else 0f }
             T9Search(vm, origin = searchOrigin, reveal = { reveal }, host = host) { searchOpen = false }
+        }
+
+        // The app being dragged out of the drawer rides under the finger, above everything.
+        dnd.app?.let { app ->
+            AppIcon(
+                app,
+                Modifier
+                    .offset {
+                        IntOffset(
+                            (dnd.pointer.x - 40.dp.toPx()).roundToInt(),
+                            (dnd.pointer.y - 50.dp.toPx()).roundToInt(),
+                        )
+                    }
+                    .size(80.dp, 100.dp),
+            )
         }
     }
 
