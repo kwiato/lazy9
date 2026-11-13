@@ -174,12 +174,15 @@ fun LauncherScreen(
 
         AnimatedVisibility(
             visible = drawerOpen,
-            enter = slideInVertically { it / 3 } + fadeIn(),
-            exit = slideOutVertically { it / 3 } + fadeOut(),
+            // Fixed, short durations: the default spring has a long invisible
+            // tail during which the faded-out drawer kept swallowing touches.
+            enter = slideInVertically(tween(220)) { it / 3 } + fadeIn(tween(180)),
+            exit = slideOutVertically(tween(140)) { it / 3 } + fadeOut(tween(140)),
         ) {
             AppDrawer(
                 vm = vm,
                 host = host,
+                active = transition.targetState == EnterExitState.Visible,
                 pickForSlot = pickSlot,
                 onClose = { drawerOpen = false },
                 onAddToHome = { app ->
@@ -192,8 +195,8 @@ fun LauncherScreen(
 
         AnimatedVisibility(
             visible = widgetsOpen,
-            enter = slideInVertically { it / 3 } + fadeIn(),
-            exit = slideOutVertically { it / 3 } + fadeOut(),
+            enter = slideInVertically(tween(220)) { it / 3 } + fadeIn(tween(180)),
+            exit = slideOutVertically(tween(140)) { it / 3 } + fadeOut(tween(140)),
         ) {
             WidgetPicker(vm) { info ->
                 widgetsOpen = false

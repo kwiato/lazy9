@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +77,8 @@ fun AppDrawer(
     vm: LauncherViewModel,
     host: LauncherHost,
     pickForSlot: Int?,
+    /** False while the drawer is animating away. */
+    active: Boolean,
     onClose: () -> Unit,
     onAddToHome: (AppEntry) -> Unit,
 ) {
@@ -83,6 +86,10 @@ fun AppDrawer(
     val flickPx = with(LocalDensity.current) { 900.dp.toPx() }
     var height by remember { mutableFloatStateOf(0f) }
     var pull by remember { mutableFloatStateOf(0f) } // how far the drawer is dragged down, px
+
+    // Reopened before the closing animation finished: this instance is reused,
+    // so it must not come back still dragged off-screen.
+    LaunchedEffect(active) { if (active) pull = 0f }
 
     val dragToClose = remember {
         object : NestedScrollConnection {
