@@ -53,5 +53,7 @@ data class LauncherState(
     val cardAlpha: Float = 1f,
     /** Draw app icons in one colour (the apps' own monochrome artwork where they ship it). */
     val monoIcons: Boolean = false,
+    /** Starred contacts show up in T9 results; tapping one calls it. */
+    val contacts: Boolean = false,
     val nextId: Long = 1,
 )

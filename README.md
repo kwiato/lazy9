@@ -15,6 +15,14 @@ A minimalist Android launcher built around T9 app search.
 - **Desktop** — pages you swipe left/right, with app icons and widgets on a
   4×5 grid. Hold an item to drag it; hold an empty spot for widgets,
   wallpaper, pages and settings.
+- **Settings** (hold the desktop → Launcher settings) — optional extras:
+  - *Persistent search*: the keypad stays on the home screen, with a column of
+    three apps beside it instead of the dock.
+  - *T9 card background*: colour and opacity.
+  - *Monochrome icons*: one-colour icons in the wallpaper palette.
+  - *Favourite contacts in T9*: starred contacts show up in the results; tap
+    one to call. Needs the contacts and phone permissions, asked for only when
+    you switch it on. Contacts stay in memory — nothing is stored or sent.
 
 ## Build
 

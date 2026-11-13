@@ -18,6 +18,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kwiato.lazy9.data.AppEntry
 import io.github.kwiato.lazy9.data.AppRepository
+import io.github.kwiato.lazy9.data.ContactEntry
+import io.github.kwiato.lazy9.data.ContactRepository
+import io.github.kwiato.lazy9.data.Hit
 import io.github.kwiato.lazy9.data.HomeItem
 import io.github.kwiato.lazy9.data.LauncherState
 import io.github.kwiato.lazy9.data.StateStore
@@ -31,6 +34,7 @@ import kotlin.math.ceil
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val repo = AppRepository(app)
     private val store = StateStore(app)
+    val contactRepo = ContactRepository(app)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val saver = Dispatchers.IO.limitedParallelism(1)
@@ -72,6 +76,25 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     var privateSpace by mutableStateOf<PrivateSpace?>(null)
         private set
+
+    /** Starred contacts; empty unless the option is on and the permission granted. */
+    var contacts by mutableStateOf<List<ContactEntry>>(emptyList())
+        private set
+
+    fun reloadContacts() {
+        if (!state.contacts) {
+            contacts = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            contacts = withContext(Dispatchers.IO) { contactRepo.favorites() }
+        }
+    }
+
+    fun setContacts(on: Boolean) {
+        update { it.copy(contacts = on) }
+        reloadContacts()
+    }
 
     // A profile (Private Space, work profile) got locked, unlocked, added or removed.
     private val profileReceiver = object : BroadcastReceiver() {
@@ -146,6 +169,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             compareByDescending<Pair<AppEntry, Int>> { it.second }
                 .thenByDescending { usage[it.first.key] ?: 0 },
         ).map { it.first }
+    }
+
+    /**
+     * Apps and favourite contacts together, best first. Contacts only join in
+     * once something is typed, and an app wins a tie.
+     */
+    fun searchAll(query: String): List<Hit> {
+        val apps = search(query)
+        if (query.isEmpty() || contacts.isEmpty()) return apps.map { Hit.App(it) }
+        val scored = apps.map { Hit.App(it) to T9.score(it.t9, query) } +
+            contacts.mapNotNull { c ->
+                val score = T9.score(c.t9, query)
+                if (score > 0) Hit.Contact(c) to score else null
+            }
+        // sortedByDescending is stable, so apps keep their order and stay ahead on ties
+        return scored.sortedByDescending { it.second }.map { it.first }
     }
 
     fun setAutoLaunch(on: Boolean) = update { it.copy(autoLaunch = on) }

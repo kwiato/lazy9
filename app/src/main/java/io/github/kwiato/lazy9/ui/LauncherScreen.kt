@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.Home
@@ -191,7 +192,7 @@ fun LauncherScreen(
                         .height(IntrinsicSize.Min)
                         .padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
-                    T9Panel(vm, Modifier.weight(1f), resetKey = searchEpoch)
+                    T9Panel(vm, Modifier.weight(1f), resetKey = searchEpoch, onCall = host::call)
                     SideDock(
                         vm, host, pickApp,
                         Modifier
@@ -253,7 +254,7 @@ fun LauncherScreen(
                 transitionSpec = { tween(if (targetState == EnterExitState.Visible) 340 else 220) },
                 label = "t9 reveal",
             ) { if (it == EnterExitState.Visible) 1f else 0f }
-            T9Search(vm, origin = searchOrigin, reveal = { reveal }) { searchOpen = false }
+            T9Search(vm, origin = searchOrigin, reveal = { reveal }, onCall = host::call) { searchOpen = false }
         }
     }
 
@@ -319,6 +320,16 @@ fun LauncherScreen(
                     stringResource(R.string.settings_autolaunch_desc),
                     trailing = { Switch(checked = vm.state.autoLaunch, onCheckedChange = { vm.setAutoLaunch(it) }) },
                 ) { vm.setAutoLaunch(!vm.state.autoLaunch) }
+                val toggleContacts = { on: Boolean ->
+                    vm.setContacts(on)
+                    if (on) host.requestContactAccess()
+                }
+                SheetRow(
+                    Icons.Outlined.Call,
+                    stringResource(R.string.settings_contacts),
+                    stringResource(R.string.settings_contacts_desc),
+                    trailing = { Switch(checked = vm.state.contacts, onCheckedChange = toggleContacts) },
+                ) { toggleContacts(!vm.state.contacts) }
                 SheetRow(
                     Icons.Outlined.PushPin,
                     stringResource(R.string.settings_persistent),

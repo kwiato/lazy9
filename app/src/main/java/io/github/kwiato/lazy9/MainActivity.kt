@@ -1,5 +1,6 @@
 package io.github.kwiato.lazy9
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.appwidget.AppWidgetHost
@@ -25,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import io.github.kwiato.lazy9.data.AppEntry
+import io.github.kwiato.lazy9.data.ContactEntry
 import io.github.kwiato.lazy9.ui.LauncherScreen
 import io.github.kwiato.lazy9.ui.LauncherTheme
 
@@ -41,6 +43,12 @@ interface LauncherHost {
     fun isDefaultLauncher(): Boolean
     fun addWidget(info: AppWidgetProviderInfo, page: Int)
     fun deleteWidget(widgetId: Int)
+
+    /** Asks for the contacts and phone permissions the "contacts in T9" option needs. */
+    fun requestContactAccess()
+
+    /** Calls straight away, or opens the dialer with the number if calling was not allowed. */
+    fun call(contact: ContactEntry)
 }
 
 /** Owns the AppWidgetHost and one host view per placed widget. */
@@ -84,6 +92,21 @@ class MainActivity : ComponentActivity(), LauncherHost {
             if (result.resultCode == RESULT_OK) configureOrFinish(pending) else cancelPending()
         }
 
+    private val contactAccess =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.reloadContacts() }
+
+    override fun requestContactAccess() {
+        try {
+            contactAccess.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE))
+        } catch (e: Exception) {
+        }
+    }
+
+    override fun call(contact: ContactEntry) {
+        val action = if (vm.contactRepo.canCall()) Intent.ACTION_CALL else Intent.ACTION_DIAL
+        tryStart(Intent(action, Uri.fromParts("tel", contact.number, null)))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -109,6 +132,7 @@ class MainActivity : ComponentActivity(), LauncherHost {
 
     override fun onStart() {
         super.onStart()
+        vm.reloadContacts() // favourites may have changed while we were away
         try {
             widgets.host.startListening()
         } catch (e: Exception) {
