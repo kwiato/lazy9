@@ -48,5 +48,8 @@ data class LauncherState(
     val autoLaunch: Boolean = false,
     /** The T9 keypad sits on the home screen with a column of three apps beside it, replacing the dock. */
     val persistentSearch: Boolean = false,
+    /** Background of the T9 card: 0xRRGGBB and its opacity, 0 (invisible) to 1. */
+    val cardColor: Long = 0x171A21,
+    val cardAlpha: Float = 1f,
     val nextId: Long = 1,
 )

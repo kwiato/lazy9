@@ -51,6 +51,9 @@
     <string name="settings_persistent">Persistent search</string>
     <string name="settings_persistent_desc">Keep the T9 keypad on the home screen, with three apps beside it instead of the dock</string>
 
+    <string name="settings_card">T9 card background</string>
+    <string name="settings_card_opacity">Opacity</string>
+
     <string name="widget_unavailable">Widget unavailable</string>
     <string name="widget_width">Width</string>
     <string name="widget_height">Height</string>

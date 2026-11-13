@@ -12,6 +12,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -31,12 +33,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Settings
@@ -47,6 +52,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,6 +83,7 @@ import io.github.kwiato.lazy9.LockService
 import io.github.kwiato.lazy9.R
 import io.github.kwiato.lazy9.WidgetController
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -282,8 +290,16 @@ fun LauncherScreen(
     if (settingsOpen) {
         var isDefault by remember { mutableStateOf(host.isDefaultLauncher()) }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { isDefault = host.isDefaultLauncher() }
-        ModalBottomSheet(onDismissRequest = { settingsOpen = false }) {
-            Column(Modifier.navigationBarsPadding()) {
+        ModalBottomSheet(
+            onDismissRequest = { settingsOpen = false },
+            // Opens at full height: half-open it would cut the last settings off.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                Modifier
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 SheetRow(
                     Icons.Outlined.Home,
                     stringResource(R.string.settings_default_launcher),
@@ -313,6 +329,7 @@ fun LauncherScreen(
                         )
                     },
                 ) { vm.setPersistentSearch(!vm.state.persistentSearch) }
+                CardBackgroundSetting(vm)
             }
         }
     }
@@ -332,6 +349,67 @@ fun LauncherScreen(
                 TextButton(onClick = { lockHelp = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+private val CARD_COLORS = listOf(
+    0x171A21L, 0x000000L, 0x3A3F4BL, 0xFFFFFFL, 0x1B3558L, 0x1D4035L, 0x4A2338L, 0x4A3A1CL,
+)
+
+/** Colour swatches and an opacity slider for the T9 card. */
+@Composable
+private fun CardBackgroundSetting(vm: LauncherViewModel) {
+    Column(Modifier.padding(horizontal = 24.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Palette, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(20.dp))
+            Text(stringResource(R.string.settings_card), style = MaterialTheme.typography.bodyLarge)
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            for (rgb in CARD_COLORS) {
+                val selected = vm.state.cardColor == rgb
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .border(
+                            if (selected) 3.dp else 1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            CircleShape,
+                        )
+                        .padding(if (selected) 5.dp else 1.dp)
+                        .background(Color(0xFF000000 or rgb), CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { vm.setCardColor(rgb) },
+                )
+            }
+        }
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.settings_card_opacity),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Slider(
+                value = vm.state.cardAlpha,
+                onValueChange = { vm.setCardAlpha(it) },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            )
+            Text(
+                "${(vm.state.cardAlpha * 100).roundToInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(36.dp),
+            )
+        }
     }
 }
 

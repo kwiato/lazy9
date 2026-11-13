@@ -23,8 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +41,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -53,9 +56,6 @@ import io.github.kwiato.lazy9.LauncherViewModel
 import io.github.kwiato.lazy9.R
 
 private const val MAX_RESULTS = 3
-
-/** Opaque, so the desktop underneath doesn't show through the card. */
-private val CardColor = Color(0xFF171A21)
 
 private val KEYS = listOf(
     "1" to "", "2" to "ABC", "3" to "DEF",
@@ -146,10 +146,16 @@ fun T9Panel(
         }
     }
 
+    // The card's colour and opacity are the user's choice; the keys stay
+    // readable by switching to dark ink on a light, mostly opaque card.
+    val card = Color(0xFF000000 or vm.state.cardColor).copy(alpha = vm.state.cardAlpha)
+    val ink = if (vm.state.cardAlpha > 0.5f && card.luminance() > 0.5f) Color(0xFF1F2430) else Color.White
+
+    CompositionLocalProvider(LocalContentColor provides ink) {
     Column(
         modifier
             .clip(RoundedCornerShape(32.dp))
-            .background(CardColor)
+            .background(card)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -170,7 +176,7 @@ fun T9Panel(
                 if (query.isNotEmpty()) {
                     Text(
                         stringResource(R.string.t9_no_results),
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = ink.copy(alpha = 0.6f),
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
                     )
@@ -212,6 +218,7 @@ fun T9Panel(
             }
         }
     }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -234,11 +241,11 @@ private fun RowScope.Key(
 @Composable
 private fun ClearKeyLabel() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("1", color = Color.White, fontSize = 22.sp, lineHeight = 24.sp)
+        Text("1", fontSize = 22.sp, lineHeight = 24.sp)
         Icon(
             Icons.AutoMirrored.Outlined.Backspace,
             contentDescription = stringResource(R.string.t9_backspace),
-            tint = Color.White.copy(alpha = 0.6f),
+            tint = LocalContentColor.current.copy(alpha = 0.6f),
             modifier = Modifier.size(13.dp),
         )
     }
@@ -247,11 +254,11 @@ private fun ClearKeyLabel() {
 @Composable
 private fun KeyLabel(digit: String, letters: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(digit, color = Color.White, fontSize = 22.sp, lineHeight = 24.sp)
+        Text(digit, fontSize = 22.sp, lineHeight = 24.sp)
         if (letters.isNotEmpty()) {
             Text(
                 letters,
-                color = Color.White.copy(alpha = 0.6f),
+                color = LocalContentColor.current.copy(alpha = 0.6f),
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
                 letterSpacing = 1.5.sp,

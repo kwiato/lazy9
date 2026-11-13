@@ -152,6 +152,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPersistentSearch(on: Boolean) = update { it.copy(persistentSearch = on) }
 
+    fun setCardColor(rgb: Long) = update { it.copy(cardColor = rgb and 0xFFFFFF) }
+
+    fun setCardAlpha(alpha: Float) = update { it.copy(cardAlpha = alpha.coerceIn(0f, 1f)) }
+
     /** Dock slots on screen: the column beside the persistent keypad only fits three. */
     val dockSlots: Int get() = if (state.persistentSearch) 3 else state.dock.size
 
