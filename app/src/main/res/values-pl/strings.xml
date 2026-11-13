@@ -49,6 +49,8 @@
     <string name="settings_persistent">Stała wyszukiwarka</string>
     <string name="settings_persistent_desc">Klawiatura T9 na stałe na pulpicie, a obok niej trzy aplikacje zamiast paska</string>
 
+    <string name="settings_mono">Monochromatyczne ikony</string>
+    <string name="settings_mono_desc">Jednokolorowe ikony w barwach tapety; aplikacje bez takiej ikony stają się szare</string>
     <string name="settings_card">Tło karty T9</string>
     <string name="settings_card_opacity">Krycie</string>
 

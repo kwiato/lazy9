@@ -99,7 +99,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reload() {
         viewModelScope.launch {
-            val (list, space) = withContext(Dispatchers.Default) { repo.load() to repo.privateSpace() }
+            val (list, space) = withContext(Dispatchers.Default) { repo.load(state.monoIcons) to repo.privateSpace() }
             apps = list
             appsByKey = list.associateBy { it.key }
             privateSpace = space
@@ -153,6 +153,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun setPersistentSearch(on: Boolean) = update { it.copy(persistentSearch = on) }
 
     fun setCardColor(rgb: Long) = update { it.copy(cardColor = rgb and 0xFFFFFF) }
+
+    fun setMonoIcons(on: Boolean) {
+        update { it.copy(monoIcons = on) }
+        reload()
+    }
 
     fun setCardAlpha(alpha: Float) = update { it.copy(cardAlpha = alpha.coerceIn(0f, 1f)) }
 

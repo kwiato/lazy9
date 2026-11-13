@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.InvertColors
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.PushPin
@@ -329,6 +330,12 @@ fun LauncherScreen(
                         )
                     },
                 ) { vm.setPersistentSearch(!vm.state.persistentSearch) }
+                SheetRow(
+                    Icons.Outlined.InvertColors,
+                    stringResource(R.string.settings_mono),
+                    stringResource(R.string.settings_mono_desc),
+                    trailing = { Switch(checked = vm.state.monoIcons, onCheckedChange = { vm.setMonoIcons(it) }) },
+                ) { vm.setMonoIcons(!vm.state.monoIcons) }
                 CardBackgroundSetting(vm)
             }
         }

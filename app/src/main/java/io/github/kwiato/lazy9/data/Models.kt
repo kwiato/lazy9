@@ -51,5 +51,7 @@ data class LauncherState(
     /** Background of the T9 card: 0xRRGGBB and its opacity, 0 (invisible) to 1. */
     val cardColor: Long = 0x171A21,
     val cardAlpha: Float = 1f,
+    /** Draw app icons in one colour (the apps' own monochrome artwork where they ship it). */
+    val monoIcons: Boolean = false,
     val nextId: Long = 1,
 )
