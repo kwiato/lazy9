@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import io.github.kwiato.lazy9.LauncherHost
 import io.github.kwiato.lazy9.LauncherViewModel
 import io.github.kwiato.lazy9.R
+import io.github.kwiato.lazy9.data.AppEntry
 import io.github.kwiato.lazy9.data.ContactAction
 import io.github.kwiato.lazy9.data.ContactEntry
 import kotlinx.coroutines.Dispatchers
@@ -157,7 +158,7 @@ fun T9Panel(
 ) {
     var query by remember(resetKey) { mutableStateOf("") }
     val haptic = LocalHapticFeedback.current
-    val matches = remember(query, vm.apps, vm.state.usage, vm.contacts) { vm.searchAll(query) }
+    val matches = remember(query, vm.apps, vm.state, vm.contacts) { vm.searchAll(query) }
     val shown = matches.take(MAX_RESULTS)
 
     if (vm.state.autoLaunch) {
@@ -216,15 +217,7 @@ fun T9Panel(
                             .height(80.dp)
                             .clip(RoundedCornerShape(18.dp))
                         when (hit) {
-                            is Hit.App -> AppIcon(
-                                hit.app,
-                                cell.clickable {
-                                    vm.launch(hit.app)
-                                    onLaunched()
-                                },
-                                showLabel = false,
-                                iconSize = 56.dp,
-                            )
+                            is Hit.App -> AppResult(hit.app, vm, host, onLaunched, cell)
                             is Hit.Contact -> ContactResult(hit.contact, vm, host, onLaunched, cell)
                         }
                     }
@@ -248,6 +241,43 @@ fun T9Panel(
             }
         }
     }
+    }
+}
+
+/** An app among the results: tap to open, hold for its menu (shortcuts, hide from T9, …). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AppResult(
+    app: AppEntry,
+    vm: LauncherViewModel,
+    host: LauncherHost,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    var menu by remember { mutableStateOf(false) }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        AppIcon(
+            app,
+            Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    onClick = {
+                        vm.launch(app)
+                        onDone()
+                    },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menu = true
+                    },
+                ),
+            showLabel = false,
+            iconSize = 56.dp,
+        )
+        // The menu is always on Material's own surface, whatever the card's ink is.
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            AppMenu(menu, { menu = false }, app, vm, host)
+        }
     }
 }
 

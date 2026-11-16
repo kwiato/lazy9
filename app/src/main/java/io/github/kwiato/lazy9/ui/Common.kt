@@ -1,5 +1,6 @@
 package io.github.kwiato.lazy9.ui
 
+import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -120,6 +121,18 @@ fun AppMenu(
         }
         if (shortcuts.isNotEmpty()) HorizontalDivider()
         extra()
+        // Nothing about Private Space apps is written to disk, so they cannot be marked.
+        if (!app.isPrivate) {
+            val hidden = app.key in vm.state.hiddenT9
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.menu_hide_t9)) },
+                leadingIcon = { Checkbox(checked = hidden, onCheckedChange = null) },
+                onClick = {
+                    onDismiss()
+                    vm.setHiddenT9(app.key, !hidden)
+                },
+            )
+        }
         DropdownMenuItem(
             text = { Text(stringResource(R.string.menu_app_info)) },
             leadingIcon = { Icon(Icons.Outlined.Info, null) },

@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Dialpad
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.InvertColors
 import androidx.compose.material.icons.outlined.Palette
@@ -418,6 +419,12 @@ fun LauncherScreen(
                     stringResource(R.string.settings_autolaunch_desc),
                     trailing = { Switch(checked = vm.state.autoLaunch, onCheckedChange = { vm.setAutoLaunch(it) }) },
                 ) { vm.setAutoLaunch(!vm.state.autoLaunch) }
+                SheetRow(
+                    Icons.Outlined.History,
+                    stringResource(R.string.settings_recent),
+                    stringResource(R.string.settings_recent_desc),
+                    trailing = { Switch(checked = vm.state.showRecent, onCheckedChange = { vm.setShowRecent(it) }) },
+                ) { vm.setShowRecent(!vm.state.showRecent) }
                 val toggleContacts = { on: Boolean ->
                     vm.setContacts(on)
                     if (on) host.requestContactAccess()

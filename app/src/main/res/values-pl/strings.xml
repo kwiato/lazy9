@@ -44,6 +44,9 @@
     <string name="settings_gestures">Gest wygaszania ekranu</string>
     <string name="settings_gestures_on">Usługa ułatwień dostępu jest włączona</string>
     <string name="settings_gestures_off">Dotknij, żeby włączyć usługę ułatwień dostępu</string>
+    <string name="menu_hide_t9">Ukryj w T9</string>
+    <string name="settings_recent">Ostatnie aplikacje w T9</string>
+    <string name="settings_recent_desc">Pusta klawiatura pokazuje ostatnio otwierane aplikacje zamiast najczęściej używanych</string>
     <string name="settings_autolaunch">Uruchamiaj jedyne dopasowanie T9</string>
     <string name="settings_autolaunch_desc">Otwórz aplikację od razu, gdy pasuje tylko jedna</string>
     <string name="settings_contacts">Ulubione kontakty w T9</string>

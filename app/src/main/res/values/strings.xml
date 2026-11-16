@@ -46,6 +46,9 @@
     <string name="settings_gestures">Screen-off gesture</string>
     <string name="settings_gestures_on">Accessibility service is on</string>
     <string name="settings_gestures_off">Tap to switch the accessibility service on</string>
+    <string name="menu_hide_t9">Hide from T9</string>
+    <string name="settings_recent">Recent apps in T9</string>
+    <string name="settings_recent_desc">The empty keypad shows the last opened apps instead of the most used</string>
     <string name="settings_autolaunch">Launch a single T9 match</string>
     <string name="settings_autolaunch_desc">Open the app straight away when only one matches</string>
     <string name="settings_contacts">Favourite contacts in T9</string>

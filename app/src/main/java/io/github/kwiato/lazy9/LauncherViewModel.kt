@@ -63,6 +63,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                     items = s.items.filterNot { gone(it.appKey) },
                     dock = s.dock.map { if (gone(it)) null else it },
                     usage = s.usage.filterKeys { !gone(it) },
+                    recent = s.recent.filterNot { gone(it) },
+                    hiddenT9 = s.hiddenT9.filterNot { gone(it) }.toSet(),
                 )
             }
             reload()
@@ -152,18 +154,29 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Nothing about Private Space apps is written to disk.
         if (app.isPrivate) return
-        update { it.copy(usage = it.usage + (app.key to (it.usage[app.key] ?: 0) + 1)) }
+        update {
+            it.copy(
+                usage = it.usage + (app.key to (it.usage[app.key] ?: 0) + 1),
+                recent = (listOf(app.key) + it.recent.filter { key -> key != app.key }).take(RECENT_MAX),
+            )
+        }
     }
 
-    /** T9 matches, best first. An empty query lists the most used apps. */
+    /**
+     * T9 matches, best first; among equally good matches the more often
+     * launched app wins. An empty query lists the most used apps, or the last
+     * launched ones when that option is on. Apps hidden from T9 never show.
+     */
     fun search(query: String): List<AppEntry> {
         val usage = state.usage
+        val hidden = state.hiddenT9
         if (query.isEmpty()) {
-            return apps.filter { (usage[it.key] ?: 0) > 0 }
+            if (state.showRecent) return state.recent.mapNotNull { appsByKey[it] }.filter { it.key !in hidden }
+            return apps.filter { (usage[it.key] ?: 0) > 0 && it.key !in hidden }
                 .sortedByDescending { usage[it.key] ?: 0 }
         }
         return apps.mapNotNull { app ->
-            val score = T9.score(app.t9, query)
+            val score = if (app.key in hidden) 0 else T9.score(app.t9, query)
             if (score > 0) app to score else null
         }.sortedWith(
             compareByDescending<Pair<AppEntry, Int>> { it.second }
@@ -186,6 +199,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         // sortedByDescending is stable, so apps keep their order and stay ahead on ties
         return scored.sortedByDescending { it.second }.map { it.first }
     }
+
+    fun setShowRecent(on: Boolean) = update { it.copy(showRecent = on) }
+
+    fun setHiddenT9(key: String, hidden: Boolean) =
+        update { it.copy(hiddenT9 = if (hidden) it.hiddenT9 + key else it.hiddenT9 - key) }
 
     fun setAutoLaunch(on: Boolean) = update { it.copy(autoLaunch = on) }
 
@@ -415,5 +433,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             if (info.targetCellHeight > 0) sy = info.targetCellHeight
         }
         return sx.coerceIn(1, s.cols) to sy.coerceIn(1, s.rows)
+    }
+
+    private companion object {
+        const val RECENT_MAX = 12
     }
 }

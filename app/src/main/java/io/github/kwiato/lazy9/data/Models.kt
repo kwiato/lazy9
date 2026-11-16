@@ -46,6 +46,12 @@ data class LauncherState(
     /** Launch counts per app key — ranks T9 results. */
     val usage: Map<String, Int> = emptyMap(),
     val autoLaunch: Boolean = false,
+    /** App keys in the order they were last launched, newest first. */
+    val recent: List<String> = emptyList(),
+    /** The empty keypad lists the last launched apps instead of the most used ones. */
+    val showRecent: Boolean = false,
+    /** Apps the user chose to keep out of T9 results. */
+    val hiddenT9: Set<String> = emptySet(),
     /** The T9 keypad sits on the home screen with a column of three apps beside it, replacing the dock. */
     val persistentSearch: Boolean = false,
     /** Background of the T9 card: 0xRRGGBB and its opacity, 0 (invisible) to 1. */
