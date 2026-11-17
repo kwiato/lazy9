@@ -15,6 +15,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -239,6 +244,18 @@ fun LauncherScreen(
                     Modifier
                         .fillMaxWidth()
                         .height(IntrinsicSize.Min)
+                        // Swiping sideways over the keypad or the side dock drags the
+                        // pages above, exactly as if the finger were on them: no reaching up.
+                        .scrollable(
+                            state = pagerState,
+                            orientation = Orientation.Horizontal,
+                            reverseDirection = ScrollableDefaults.reverseDirection(
+                                LocalLayoutDirection.current,
+                                Orientation.Horizontal,
+                                reverseScrolling = false,
+                            ),
+                            flingBehavior = PagerDefaults.flingBehavior(pagerState),
+                        )
                         .padding(start = 12.dp, top = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
                     Box(Modifier.weight(1f)) {
