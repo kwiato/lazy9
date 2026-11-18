@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -457,8 +458,8 @@ fun Workspace(
     }
 }
 
-/** Half the side of a resize handle's touch target. */
-private val HANDLE_REACH = 20.dp
+/** Side of a resize handle's touch target; it lies inside the frame, away from the screen's gesture edges. */
+private val HANDLE_SIZE = 44.dp
 
 /**
  * The resize frame around [rect] (workspace pixels) with a dot on each side and corner.
@@ -477,21 +478,23 @@ private fun ResizeFrame(
     onEnd: () -> Unit,
 ) {
     val density = LocalDensity.current
-    val reach = with(density) { HANDLE_REACH.toPx() }
+    val frameW = with(density) { rect.width.toDp() }
+    val frameH = with(density) { rect.height.toDp() }
+    // On a small widget the handles shrink so corners and sides do not overlap.
+    val handleW = minOf(HANDLE_SIZE, frameW / 3)
+    val handleH = minOf(HANDLE_SIZE, frameH / 3)
     val current by rememberUpdatedState(rect)
     val onStartNow by rememberUpdatedState(onStart)
     val onResizeNow by rememberUpdatedState(onResize)
     val onEndNow by rememberUpdatedState(onEnd)
-    // The frame box reaches past the widget by HANDLE_REACH so the handles stay inside it.
     Box(
         Modifier
-            .offset { IntOffset((rect.left - reach).roundToInt(), (rect.top - reach).roundToInt()) }
-            .size(with(density) { (rect.width + 2 * reach).toDp() }, with(density) { (rect.height + 2 * reach).toDp() }),
+            .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
+            .size(frameW, frameH),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(HANDLE_REACH)
                 .padding(2.dp)
                 .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(18.dp)),
         )
@@ -502,7 +505,9 @@ private fun ResizeFrame(
             Box(
                 Modifier
                     .align(BiasAlignment(hx.toFloat(), hy.toFloat()))
-                    .size(HANDLE_REACH * 2)
+                    .size(handleW, handleH)
+                    // The system back gesture does not take touches that start on a handle.
+                    .systemGestureExclusion()
                     .pointerInput(hx, hy, limits, cellWpx, cellHpx, gridW, gridH) {
                         var start = Rect.Zero
                         var travel = Offset.Zero
