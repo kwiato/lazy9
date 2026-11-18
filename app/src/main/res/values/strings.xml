@@ -78,8 +78,6 @@
     <string name="settings_card_opacity">Opacity</string>
 
     <string name="widget_unavailable">Widget unavailable</string>
-    <string name="widget_width">Width</string>
-    <string name="widget_height">Height</string>
     <string name="widgets_none">No widgets installed</string>
     <string name="widget_failed">Couldn\'t add the widget</string>
 </resources>

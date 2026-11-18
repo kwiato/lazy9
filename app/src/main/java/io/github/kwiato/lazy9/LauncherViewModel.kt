@@ -399,10 +399,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         return true
     }
 
-    fun resizeItem(id: Long, spanX: Int, spanY: Int): Boolean {
+    /** Moves and resizes an item on its page in one step (resize handles move the left/top edges too). */
+    fun setItemBounds(id: Long, x: Int, y: Int, spanX: Int, spanY: Int): Boolean {
         val item = state.items.find { it.id == id } ?: return false
-        if (spanX < 1 || spanY < 1 || !canPlace(id, item.page, item.x, item.y, spanX, spanY)) return false
-        update { s -> s.copy(items = s.items.map { if (it.id == id) it.copy(spanX = spanX, spanY = spanY) else it }) }
+        if (spanX < 1 || spanY < 1 || !canPlace(id, item.page, x, y, spanX, spanY)) return false
+        update { s ->
+            s.copy(items = s.items.map { if (it.id == id) it.copy(x = x, y = y, spanX = spanX, spanY = spanY) else it })
+        }
         return true
     }
 

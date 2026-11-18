@@ -76,8 +76,6 @@
     <string name="settings_card_opacity">Krycie</string>
 
     <string name="widget_unavailable">Widżet niedostępny</string>
-    <string name="widget_width">Szerokość</string>
-    <string name="widget_height">Wysokość</string>
     <string name="widgets_none">Brak zainstalowanych widżetów</string>
     <string name="widget_failed">Nie udało się dodać widżetu</string>
 </resources>

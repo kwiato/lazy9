@@ -16,7 +16,8 @@ A minimalist Android launcher built around T9 app search.
   dock, out of the app list onto either, or onto *Remove* at the top.
 - **Desktop** — pages you swipe left/right, with app icons and widgets on a
   4×5 grid. Hold an item to drag it; hold an empty spot for widgets,
-  wallpaper, pages and settings.
+  wallpaper, pages and settings. Hold a widget → *Resize* puts a frame on it:
+  drag the dots on its sides and corners, tap elsewhere when done.
 - **Settings** (hold the desktop → Launcher settings) — optional extras:
   - *Persistent search*: the keypad stays on the home screen, with a column of
     three apps beside it instead of the dock.

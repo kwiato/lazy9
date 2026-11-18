@@ -1,47 +1,45 @@
 package io.github.kwiato.lazy9.ui
 
+import android.appwidget.AppWidgetProviderInfo
+import android.os.Build
 import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -54,6 +52,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -63,12 +62,40 @@ import io.github.kwiato.lazy9.R
 import io.github.kwiato.lazy9.WidgetController
 import io.github.kwiato.lazy9.data.HomeItem
 import kotlinx.coroutines.delay
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /** An item being dragged. Positions are in workspace coordinates. */
 private class DragInfo(val itemId: Long, val grab: Offset, val start: Offset) {
     var pointer by mutableStateOf(start)
     var moved by mutableStateOf(false)
+}
+
+/** How far a widget may be resized, in cells, and along which axes. */
+private class SpanLimits(
+    val minX: Int, val minY: Int, val maxX: Int, val maxY: Int,
+    val horizontal: Boolean, val vertical: Boolean,
+)
+
+/** Resize limits declared by a widget, translated to cells of [cellWpx]×[cellHpx]. */
+private fun spanLimits(info: AppWidgetProviderInfo?, cols: Int, rows: Int, cellWpx: Float, cellHpx: Float): SpanLimits {
+    if (info == null) return SpanLimits(1, 1, cols, rows, horizontal = true, vertical = true)
+    fun minSpan(px: Int, cell: Float, max: Int) =
+        if (px <= 0 || cell <= 0f) 1 else ceil(px / cell - 0.05f).toInt().coerceIn(1, max)
+    var maxX = cols
+    var maxY = rows
+    if (Build.VERSION.SDK_INT >= 31) {
+        if (info.maxResizeWidth > 0 && cellWpx > 0f) maxX = floor(info.maxResizeWidth / cellWpx).toInt().coerceIn(1, cols)
+        if (info.maxResizeHeight > 0 && cellHpx > 0f) maxY = floor(info.maxResizeHeight / cellHpx).toInt().coerceIn(1, rows)
+    }
+    val minX = minSpan(info.minResizeWidth.takeIf { it > 0 } ?: info.minWidth, cellWpx, cols).coerceAtMost(maxX)
+    val minY = minSpan(info.minResizeHeight.takeIf { it > 0 } ?: info.minHeight, cellHpx, rows).coerceAtMost(maxY)
+    return SpanLimits(
+        minX, minY, maxX, maxY,
+        horizontal = info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0,
+        vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
+    )
 }
 
 /** The swipeable home pages: a grid of app icons and widgets, rearranged by long-press drag. */
@@ -87,7 +114,9 @@ fun Workspace(
 
     var drag by remember { mutableStateOf<DragInfo?>(null) }
     var menuId by remember { mutableStateOf<Long?>(null) }
+    // Widget in resize mode (frame with handles) and its live, unsnapped bounds while a handle is dragged.
     var resizeId by remember { mutableStateOf<Long?>(null) }
+    var resizeRect by remember { mutableStateOf<Rect?>(null) }
     var wsCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     BoxWithConstraints(modifier.onGloballyPositioned { wsCoords = it }) {
@@ -116,6 +145,31 @@ fun Workspace(
                     )
                 }
             }
+        }
+
+        val resizing = state.items.find { it.id == resizeId }
+        val limits = resizing?.widgetId?.let { id ->
+            remember(id, state.cols, state.rows, cellWpx, cellHpx) {
+                spanLimits(widgets.manager.getAppWidgetInfo(id), state.cols, state.rows, cellWpx, cellHpx)
+            }
+        }
+        // Cells the dragged frame snaps to (left, top, right, bottom); null when no handle is held.
+        val preview = resizeRect?.let { r ->
+            IntRect(
+                (r.left / cellWpx).roundToInt(),
+                (r.top / cellHpx).roundToInt(),
+                (r.right / cellWpx).roundToInt(),
+                (r.bottom / cellHpx).roundToInt(),
+            )
+        }
+        val previewFits = resizing != null && preview != null &&
+            vm.canPlace(resizing.id, resizing.page, preview.left, preview.top, preview.width, preview.height)
+        LaunchedEffect(preview) {
+            if (preview != null) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+        BackHandler(enabled = resizing != null) {
+            resizeId = null
+            resizeRect = null
         }
 
         fun targetCell(d: DragInfo, item: HomeItem): IntOffset {
@@ -175,10 +229,13 @@ fun Workspace(
                             var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
                             val d = drag
                             val lifted = d != null && d.itemId == item.id && d.moved
+                            // A widget being resized already takes the size its frame snaps to.
+                            val cells = if (item.id == resizeId && preview != null && previewFits) preview
+                            else IntRect(item.x, item.y, item.x + item.spanX, item.y + item.spanY)
                             Box(
                                 Modifier
-                                    .offset(cellW * item.x, cellH * item.y)
-                                    .size(cellW * item.spanX, cellH * item.spanY)
+                                    .offset(cellW * cells.left, cellH * cells.top)
+                                    .size(cellW * cells.width, cellH * cells.height)
                                     .onGloballyPositioned { coords = it }
                                     .alpha(if (lifted) 0.3f else 1f)
                                     .pointerInput(item.id) {
@@ -261,11 +318,16 @@ fun Workspace(
                                 } else if (item.widgetId != null) {
                                     WidgetView(item.widgetId, widgets)
                                     DropdownMenu(menuId == item.id, onDismissRequest = { menuId = null }) {
-                                        DropdownMenuItem(
+                                        val resizable = remember(item.widgetId) {
+                                            (widgets.manager.getAppWidgetInfo(item.widgetId)?.resizeMode
+                                                ?: AppWidgetProviderInfo.RESIZE_BOTH) != AppWidgetProviderInfo.RESIZE_NONE
+                                        }
+                                        if (resizable) DropdownMenuItem(
                                             text = { Text(stringResource(R.string.menu_resize)) },
                                             leadingIcon = { Icon(Icons.Outlined.AspectRatio, null) },
                                             onClick = {
                                                 menuId = null
+                                                resizeRect = null
                                                 resizeId = item.id
                                             },
                                         )
@@ -345,10 +407,141 @@ fun Workspace(
                 }
             }
         }
-    }
 
-    val resizing = state.items.find { it.id == resizeId }
-    if (resizing != null) ResizeDialog(vm, resizing) { resizeId = null }
+        // Resize mode: a frame with handles on the sides and corners; a tap elsewhere ends it.
+        if (resizing != null && limits != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures {
+                            resizeId = null
+                            resizeRect = null
+                        }
+                    },
+            )
+            val shape = RoundedCornerShape(18.dp)
+            if (preview != null) Box(
+                Modifier
+                    .offset(cellW * preview.left, cellH * preview.top)
+                    .size(cellW * preview.width, cellH * preview.height)
+                    .padding(4.dp)
+                    .border(
+                        2.dp,
+                        if (previewFits) Color.White.copy(alpha = 0.5f) else Color(0xFFFF6B6B).copy(alpha = 0.85f),
+                        shape,
+                    ),
+            )
+            val itemRect = Rect(
+                resizing.x * cellWpx,
+                resizing.y * cellHpx,
+                (resizing.x + resizing.spanX) * cellWpx,
+                (resizing.y + resizing.spanY) * cellHpx,
+            )
+            ResizeFrame(
+                rect = resizeRect ?: itemRect,
+                limits = limits,
+                cellWpx = cellWpx,
+                cellHpx = cellHpx,
+                gridW = state.cols * cellWpx,
+                gridH = state.rows * cellHpx,
+                onStart = { resizeRect = itemRect },
+                onResize = { resizeRect = it },
+                onEnd = {
+                    val p = preview
+                    if (p != null && previewFits) vm.setItemBounds(resizing.id, p.left, p.top, p.width, p.height)
+                    resizeRect = null
+                },
+            )
+        }
+    }
+}
+
+/** Half the side of a resize handle's touch target. */
+private val HANDLE_REACH = 20.dp
+
+/**
+ * The resize frame around [rect] (workspace pixels) with a dot on each side and corner.
+ * A handle moves its edges by the finger's travel, kept within the grid and [limits].
+ */
+@Composable
+private fun ResizeFrame(
+    rect: Rect,
+    limits: SpanLimits,
+    cellWpx: Float,
+    cellHpx: Float,
+    gridW: Float,
+    gridH: Float,
+    onStart: () -> Unit,
+    onResize: (Rect) -> Unit,
+    onEnd: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val reach = with(density) { HANDLE_REACH.toPx() }
+    val current by rememberUpdatedState(rect)
+    val onStartNow by rememberUpdatedState(onStart)
+    val onResizeNow by rememberUpdatedState(onResize)
+    val onEndNow by rememberUpdatedState(onEnd)
+    // The frame box reaches past the widget by HANDLE_REACH so the handles stay inside it.
+    Box(
+        Modifier
+            .offset { IntOffset((rect.left - reach).roundToInt(), (rect.top - reach).roundToInt()) }
+            .size(with(density) { (rect.width + 2 * reach).toDp() }, with(density) { (rect.height + 2 * reach).toDp() }),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(HANDLE_REACH)
+                .padding(2.dp)
+                .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(18.dp)),
+        )
+        for (hx in -1..1) for (hy in -1..1) {
+            if (hx == 0 && hy == 0) continue
+            if (hx != 0 && !limits.horizontal) continue
+            if (hy != 0 && !limits.vertical) continue
+            Box(
+                Modifier
+                    .align(BiasAlignment(hx.toFloat(), hy.toFloat()))
+                    .size(HANDLE_REACH * 2)
+                    .pointerInput(hx, hy, limits, cellWpx, cellHpx, gridW, gridH) {
+                        var start = Rect.Zero
+                        var travel = Offset.Zero
+                        detectDragGestures(
+                            onDragStart = {
+                                onStartNow()
+                                start = current
+                                travel = Offset.Zero
+                            },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                travel += amount
+                                var (l, t, r, b) = start
+                                // A widget already outside its declared limits keeps its size as the bound.
+                                val minW = minOf(limits.minX * cellWpx, start.width)
+                                val maxW = maxOf(limits.maxX * cellWpx, start.width)
+                                val minH = minOf(limits.minY * cellHpx, start.height)
+                                val maxH = maxOf(limits.maxY * cellHpx, start.height)
+                                if (hx < 0) l = (l + travel.x).coerceIn(maxOf(0f, r - maxW), r - minW)
+                                if (hx > 0) r = (r + travel.x).coerceIn(l + minW, minOf(gridW, l + maxW))
+                                if (hy < 0) t = (t + travel.y).coerceIn(maxOf(0f, b - maxH), b - minH)
+                                if (hy > 0) b = (b + travel.y).coerceIn(t + minH, minOf(gridH, t + maxH))
+                                onResizeNow(Rect(l, t, r, b))
+                            },
+                            onDragEnd = { onEndNow() },
+                            onDragCancel = { onEndNow() },
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(14.dp)
+                        .background(Color.White, CircleShape)
+                        .border(1.5.dp, Color.Black.copy(alpha = 0.3f), CircleShape),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -385,44 +578,5 @@ private fun WidgetView(widgetId: Int, widgets: WidgetController) {
                     view.updateAppWidgetSize(null, w, h, w, h)
                 },
         )
-    }
-}
-
-@Composable
-private fun ResizeDialog(vm: LauncherViewModel, item: HomeItem, onClose: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onClose,
-        confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.done)) } },
-        title = { Text(stringResource(R.string.menu_resize)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Stepper(
-                    label = stringResource(R.string.widget_width),
-                    value = item.spanX,
-                    canGrow = vm.canPlace(item.id, item.page, item.x, item.y, item.spanX + 1, item.spanY),
-                    onChange = { vm.resizeItem(item.id, it, item.spanY) },
-                )
-                Stepper(
-                    label = stringResource(R.string.widget_height),
-                    value = item.spanY,
-                    canGrow = vm.canPlace(item.id, item.page, item.x, item.y, item.spanX, item.spanY + 1),
-                    onChange = { vm.resizeItem(item.id, item.spanX, it) },
-                )
-            }
-        },
-    )
-}
-
-@Composable
-private fun Stepper(label: String, value: Int, canGrow: Boolean, onChange: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f))
-        FilledTonalIconButton(onClick = { onChange(value - 1) }, enabled = value > 1) {
-            Icon(Icons.Outlined.Remove, null)
-        }
-        Text(value.toString(), Modifier.width(40.dp), textAlign = TextAlign.Center, fontSize = 18.sp)
-        FilledTonalIconButton(onClick = { onChange(value + 1) }, enabled = canGrow) {
-            Icon(Icons.Outlined.Add, null)
-        }
     }
 }
