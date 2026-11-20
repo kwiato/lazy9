@@ -66,7 +66,17 @@ data class LauncherState(
     val letterSize: Float = 10f,
     /** Draw app icons in one colour (the apps' own monochrome artwork where they ship it). */
     val monoIcons: Boolean = false,
+    /** Colour of Private Space apps' monochrome icons: [PRIVATE_TINT_OFF], [PRIVATE_TINT_WALLPAPER] or 0xRRGGBB. */
+    val privateTint: Long = PRIVATE_TINT_WALLPAPER,
+    /** Small mark in the bottom-right corner of Private Space icons: "none", "lock" or "shield". */
+    val privateMark: String = PRIVATE_MARK_LOCK,
     /** Starred contacts show up in T9 results; tapping one calls it. */
     val contacts: Boolean = false,
     val nextId: Long = 1,
 )
+
+const val PRIVATE_TINT_OFF = -1L
+const val PRIVATE_TINT_WALLPAPER = -2L
+const val PRIVATE_MARK_NONE = "none"
+const val PRIVATE_MARK_LOCK = "lock"
+const val PRIVATE_MARK_SHIELD = "shield"

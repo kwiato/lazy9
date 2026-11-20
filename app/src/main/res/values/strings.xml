@@ -60,6 +60,17 @@
 
     <string name="settings_mono">Monochrome icons</string>
     <string name="settings_mono_desc">One-colour app icons in the wallpaper palette; apps without such an icon turn grey</string>
+    <string name="settings_private">Private space icons</string>
+    <string name="settings_private_desc">Colour and corner mark that tell private apps apart</string>
+    <string name="private_tint">Colour</string>
+    <string name="private_tint_desc">Private apps\' monochrome icons take this colour instead of the regular one</string>
+    <string name="private_tint_mono_off">Applies to monochrome icons; turn them on in settings</string>
+    <string name="private_tint_off">Same as other apps</string>
+    <string name="private_tint_wallpaper">Wallpaper accent</string>
+    <string name="private_mark">Corner mark</string>
+    <string name="private_mark_none">None (system badge)</string>
+    <string name="private_mark_lock">Padlock</string>
+    <string name="private_mark_shield">Shield</string>
     <string name="settings_card">T9 card appearance</string>
     <string name="settings_card_desc">Colour, opacity, size and text size</string>
     <string name="card_width">Width</string>

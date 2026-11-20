@@ -124,7 +124,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reload() {
         viewModelScope.launch {
-            val (list, space) = withContext(Dispatchers.Default) { repo.load(state.monoIcons) to repo.privateSpace() }
+            val (list, space) = withContext(Dispatchers.Default) { repo.load(state.monoIcons, state.privateTint, state.privateMark) to repo.privateSpace() }
             apps = list
             appsByKey = list.associateBy { it.key }
             privateSpace = space
@@ -213,6 +213,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setMonoIcons(on: Boolean) {
         update { it.copy(monoIcons = on) }
+        reload()
+    }
+
+    fun setPrivateTint(tint: Long) {
+        update { it.copy(privateTint = tint) }
+        reload()
+    }
+
+    fun setPrivateMark(mark: String) {
+        update { it.copy(privateMark = mark) }
         reload()
     }
 

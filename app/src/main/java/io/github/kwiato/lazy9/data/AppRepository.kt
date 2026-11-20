@@ -11,7 +11,12 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Color
 import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.Drawable
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
+import io.github.kwiato.lazy9.R
 import android.os.Build
 import android.os.UserHandle
 import android.os.UserManager
@@ -27,8 +32,16 @@ class AppRepository(private val context: Context) {
 
     fun serialOf(user: UserHandle): Long = userManager.getSerialNumberForUser(user)
 
-    /** @param mono draw every icon in one colour, see [monoIcon]. */
-    fun load(mono: Boolean = false): List<AppEntry> {
+    /**
+     * @param mono draw every icon in one colour, see [monoIcon].
+     * @param privateTint colour of Private Space icons in [mono] mode, see [LauncherState.privateTint].
+     * @param privateMark corner mark on Private Space icons, see [LauncherState.privateMark].
+     */
+    fun load(
+        mono: Boolean = false,
+        privateTint: Long = PRIVATE_TINT_OFF,
+        privateMark: String = PRIVATE_MARK_NONE,
+    ): List<AppEntry> {
         val metrics = context.resources.displayMetrics
         val iconPx = (60 * metrics.density).roundToInt()
         val out = ArrayList<AppEntry>()
@@ -42,22 +55,27 @@ class AppRepository(private val context: Context) {
             } catch (e: Exception) {
                 emptyList()
             }
+            val palette = if (private) privatePalette(privateTint) else null
+            val mark = if (private) markDrawable(privateMark) else null
             for (info in activities) {
                 val cn = info.componentName
                 if (cn.packageName == context.packageName) continue
                 val label = info.label?.toString()?.trim().orEmpty().ifEmpty { cn.packageName }
                 val drawable = try {
-                    info.getBadgedIcon(metrics.densityDpi)
+                    // Our own mark replaces the system's profile badge, so there are never two.
+                    if (mark != null) info.getIcon(metrics.densityDpi) else info.getBadgedIcon(metrics.densityDpi)
                 } catch (e: Exception) {
                     context.packageManager.defaultActivityIcon
                 }
+                var bitmap = (if (mono) monoIcon(info, iconPx, palette) else null)
+                    ?: drawable.toBitmap(iconPx, iconPx)
+                if (mark != null) bitmap = withMark(bitmap, mark, palette)
                 out += AppEntry(
                     key = "${cn.packageName}/${cn.className}#$serial",
                     label = label,
                     component = cn,
                     user = user,
-                    icon = ((if (mono) monoIcon(info, iconPx) else null) ?: drawable.toBitmap(iconPx, iconPx))
-                        .asImageBitmap(),
+                    icon = bitmap.asImageBitmap(),
                     t9 = T9.encode(label),
                     isPrivate = private,
                 )
@@ -75,7 +93,7 @@ class AppRepository(private val context: Context) {
      * ship none get their normal icon with the colour drained, so the set still
      * looks uniform. Null if the icon cannot be loaded at all.
      */
-    private fun monoIcon(info: LauncherActivityInfo, px: Int): Bitmap? = try {
+    private fun monoIcon(info: LauncherActivityInfo, px: Int, palette: Palette? = null): Bitmap? = try {
         val raw = info.getIcon(context.resources.displayMetrics.densityDpi)
         val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -86,17 +104,26 @@ class AppRepository(private val context: Context) {
                 transform(Matrix().apply { setScale(px / 100f, px / 100f) })
             }
             canvas.clipPath(shape)
-            canvas.drawColor(context.getColor(android.R.color.system_accent2_800))
+            canvas.drawColor(palette?.dark ?: context.getColor(android.R.color.system_accent2_800))
             // Adaptive layers are 108dp wide with the middle 72dp visible.
             val bleed = px / 4
             layer.mutate().apply {
                 setBounds(-bleed, -bleed, px + bleed, px + bleed)
-                setTint(context.getColor(android.R.color.system_accent1_100))
+                setTint(palette?.light ?: context.getColor(android.R.color.system_accent1_100))
                 draw(canvas)
             }
         } else {
             val grey = Paint(Paint.FILTER_BITMAP_FLAG).apply {
-                colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+                colorFilter = ColorMatrixColorFilter(
+                    ColorMatrix().apply {
+                        setSaturation(0f)
+                        // Grey icons of Private Space apps take on its colour too.
+                        if (palette != null) {
+                            val c = palette.light
+                            postConcat(ColorMatrix().apply { setScale(Color.red(c) / 255f, Color.green(c) / 255f, Color.blue(c) / 255f, 1f) })
+                        }
+                    },
+                )
             }
             canvas.drawBitmap(raw.toBitmap(px, px), 0f, 0f, grey)
         }
@@ -106,6 +133,50 @@ class AppRepository(private val context: Context) {
     }
 
     // ---- Private Space (Android 15+) ----------------------------------------
+
+    /** Background and artwork colours of a tinted icon. */
+    private class Palette(val dark: Int, val light: Int)
+
+    private fun privatePalette(tint: Long): Palette? = when {
+        tint == PRIVATE_TINT_OFF -> null
+        // The wallpaper's third accent: differs from the regular icons, still matches the theme.
+        tint == PRIVATE_TINT_WALLPAPER -> if (Build.VERSION.SDK_INT >= 31) Palette(
+            context.getColor(android.R.color.system_accent3_800),
+            context.getColor(android.R.color.system_accent3_100),
+        ) else null
+        else -> {
+            val c = (0xFF000000 or tint).toInt()
+            Palette(ColorUtils.blendARGB(c, Color.BLACK, 0.65f), ColorUtils.blendARGB(c, Color.WHITE, 0.55f))
+        }
+    }
+
+    private fun markDrawable(mark: String) = when (mark) {
+        PRIVATE_MARK_LOCK -> R.drawable.ic_private_lock
+        PRIVATE_MARK_SHIELD -> R.drawable.ic_private_shield
+        else -> null
+    }?.let { ContextCompat.getDrawable(context, it) }
+
+    /** Draws [mark] in a small disc over the bottom-right corner of [icon]. */
+    private fun withMark(icon: Bitmap, mark: Drawable, palette: Palette?): Bitmap {
+        val out = if (icon.isMutable) icon else icon.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(out)
+        val px = out.width.toFloat()
+        val r = px * 0.2f
+        val cx = px - r
+        val cy = px - r
+        val disc = palette?.light ?: Color.WHITE
+        val glyph = palette?.dark ?: Color.rgb(0x10, 0x13, 0x19)
+        // A dark ring separates the disc from the icon underneath.
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = glyph })
+        canvas.drawCircle(cx, cy, r * 0.84f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = disc })
+        val g = (r * 0.55f).roundToInt()
+        mark.mutate().apply {
+            setBounds(cx.roundToInt() - g, cy.roundToInt() - g, cx.roundToInt() + g, cy.roundToInt() + g)
+            setTint(glyph)
+            draw(canvas)
+        }
+        return out
+    }
 
     private fun isPrivate(user: UserHandle): Boolean {
         if (Build.VERSION.SDK_INT < 35) return false

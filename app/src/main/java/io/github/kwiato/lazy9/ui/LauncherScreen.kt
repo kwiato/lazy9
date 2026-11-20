@@ -24,6 +24,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,6 +48,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -66,6 +70,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -103,6 +108,11 @@ import io.github.kwiato.lazy9.LauncherViewModel
 import io.github.kwiato.lazy9.LockService
 import io.github.kwiato.lazy9.R
 import io.github.kwiato.lazy9.WidgetController
+import io.github.kwiato.lazy9.data.PRIVATE_MARK_LOCK
+import io.github.kwiato.lazy9.data.PRIVATE_MARK_NONE
+import io.github.kwiato.lazy9.data.PRIVATE_MARK_SHIELD
+import io.github.kwiato.lazy9.data.PRIVATE_TINT_OFF
+import io.github.kwiato.lazy9.data.PRIVATE_TINT_WALLPAPER
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -128,6 +138,7 @@ fun LauncherScreen(
     var homeMenu by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var lockHelp by remember { mutableStateOf(false) }
+    var privateOpen by remember { mutableStateOf(false) }
     val dnd = remember { DragDrop() }
     var cardEditor by remember { mutableStateOf(false) }
 
@@ -469,6 +480,13 @@ fun LauncherScreen(
                     stringResource(R.string.settings_mono_desc),
                     trailing = { Switch(checked = vm.state.monoIcons, onCheckedChange = { vm.setMonoIcons(it) }) },
                 ) { vm.setMonoIcons(!vm.state.monoIcons) }
+                if (vm.privateSpace != null) {
+                    SheetRow(
+                        Icons.Outlined.Lock,
+                        stringResource(R.string.settings_private),
+                        stringResource(R.string.settings_private_desc),
+                    ) { privateOpen = true }
+                }
                 SheetRow(
                     Icons.Outlined.Palette,
                     stringResource(R.string.settings_card),
@@ -496,6 +514,10 @@ fun LauncherScreen(
         }
     }
 
+    if (privateOpen) {
+        PrivateIconsDialog(vm) { privateOpen = false }
+    }
+
     if (lockHelp) {
         AlertDialog(
             onDismissRequest = { lockHelp = false },
@@ -512,6 +534,92 @@ fun LauncherScreen(
             },
         )
     }
+}
+
+/** Fixed colours offered for Private Space icons, next to "off" and the wallpaper's accent. */
+private val PRIVATE_COLORS = listOf(0xE5484DL, 0xF5A524L, 0x30A46CL, 0x0091FFL, 0x8E4EC6L, 0xE93D82L)
+
+/** Colour and corner mark of Private Space app icons. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PrivateIconsDialog(vm: LauncherViewModel, onDismiss: () -> Unit) {
+    val s = vm.state
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_private)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.private_tint),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(if (s.monoIcons) R.string.private_tint_desc else R.string.private_tint_mono_off),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val options = listOf(PRIVATE_TINT_OFF, PRIVATE_TINT_WALLPAPER) + PRIVATE_COLORS
+                    for (tint in options) {
+                        val selected = s.privateTint == tint
+                        Box(
+                            Modifier
+                                .size(36.dp)
+                                .border(
+                                    if (selected) 3.dp else 1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    CircleShape,
+                                )
+                                .padding(if (selected) 5.dp else 1.dp)
+                                .background(
+                                    when (tint) {
+                                        PRIVATE_TINT_OFF -> Color.Transparent
+                                        PRIVATE_TINT_WALLPAPER -> MaterialTheme.colorScheme.tertiary
+                                        else -> Color(0xFF000000 or tint)
+                                    },
+                                    CircleShape,
+                                )
+                                .clickable { vm.setPrivateTint(tint) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            when (tint) {
+                                PRIVATE_TINT_OFF -> Icon(Icons.Outlined.Block, stringResource(R.string.private_tint_off), Modifier.size(18.dp))
+                                PRIVATE_TINT_WALLPAPER -> Icon(
+                                    Icons.Outlined.Wallpaper,
+                                    stringResource(R.string.private_tint_wallpaper),
+                                    Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(stringResource(R.string.private_mark), style = MaterialTheme.typography.titleSmall)
+                for ((mark, label) in listOf(
+                    PRIVATE_MARK_NONE to R.string.private_mark_none,
+                    PRIVATE_MARK_LOCK to R.string.private_mark_lock,
+                    PRIVATE_MARK_SHIELD to R.string.private_mark_shield,
+                )) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { vm.setPrivateMark(mark) }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = s.privateMark == mark, onClick = { vm.setPrivateMark(mark) })
+                        Text(stringResource(label))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+    )
 }
 
 private val CARD_COLORS = listOf(

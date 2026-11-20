@@ -58,6 +58,17 @@
 
     <string name="settings_mono">Monochromatyczne ikony</string>
     <string name="settings_mono_desc">Jednokolorowe ikony w barwach tapety; aplikacje bez takiej ikony stają się szare</string>
+    <string name="settings_private">Ikony przestrzeni prywatnej</string>
+    <string name="settings_private_desc">Kolor i znaczek w rogu, po których odróżnisz aplikacje prywatne</string>
+    <string name="private_tint">Kolor</string>
+    <string name="private_tint_desc">Monochromatyczne ikony aplikacji prywatnych dostają ten kolor zamiast zwykłego</string>
+    <string name="private_tint_mono_off">Dotyczy ikon monochromatycznych; włącz je w ustawieniach</string>
+    <string name="private_tint_off">Jak pozostałe aplikacje</string>
+    <string name="private_tint_wallpaper">Akcent tapety</string>
+    <string name="private_mark">Znaczek w rogu</string>
+    <string name="private_mark_none">Brak (znaczek systemowy)</string>
+    <string name="private_mark_lock">Kłódka</string>
+    <string name="private_mark_shield">Tarcza</string>
     <string name="settings_card">Wygląd karty T9</string>
     <string name="settings_card_desc">Kolor, krycie, rozmiar karty i tekstu</string>
     <string name="card_width">Szerokość</string>
