@@ -24,6 +24,10 @@ A minimalist Android launcher built around T9 app search.
   - *T9 card appearance*: colour, opacity, width, key height and the size of
     digits and letters, edited over the live card.
   - *Monochrome icons*: one-colour icons in the wallpaper palette.
+  - *Experimental: frequency in T9*: how often you open an app multiplies
+    its match score (×(1 + ln(1 + launches))) instead of only breaking ties,
+    so a daily app whose second word matches beats a rarely used one whose
+    name starts with the typed letters.
   - *Favourite contacts in T9*: starred contacts show up in the results; tap
     one to call, hold it for SMS and whatever your messengers (Signal,
     WhatsApp, Telegram, …) offer for that contact. Needs the contacts and phone permissions, asked for only when

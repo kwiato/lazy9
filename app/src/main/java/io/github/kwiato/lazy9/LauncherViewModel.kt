@@ -27,6 +27,7 @@ import io.github.kwiato.lazy9.data.StateStore
 import io.github.kwiato.lazy9.data.T9
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlin.math.ln
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
@@ -164,41 +165,62 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * T9 matches, best first; among equally good matches the more often
-     * launched app wins. An empty query lists the most used apps, or the last
-     * launched ones when that option is on. Apps hidden from T9 never show.
+     * launched app wins. With [LauncherState.usageBoost] the launch count
+     * multiplies the match score instead (see [rank]). An empty query lists
+     * the most used apps, or the last launched ones when that option is on.
+     * Apps hidden from T9 never show.
      */
-    fun search(query: String): List<AppEntry> {
+    fun search(query: String): List<AppEntry> = searchScored(query).map { it.first }
+
+    private fun searchScored(query: String): List<Pair<AppEntry, Double>> {
         val usage = state.usage
         val hidden = state.hiddenT9
         if (query.isEmpty()) {
-            if (state.showRecent) return state.recent.mapNotNull { appsByKey[it] }.filter { it.key !in hidden }
-            return apps.filter { (usage[it.key] ?: 0) > 0 && it.key !in hidden }
-                .sortedByDescending { usage[it.key] ?: 0 }
+            val list = if (state.showRecent) {
+                state.recent.mapNotNull { appsByKey[it] }.filter { it.key !in hidden }
+            } else {
+                apps.filter { (usage[it.key] ?: 0) > 0 && it.key !in hidden }
+                    .sortedByDescending { usage[it.key] ?: 0 }
+            }
+            return list.map { it to 0.0 }
         }
         return apps.mapNotNull { app ->
             val score = if (app.key in hidden) 0 else T9.score(app.t9, query)
-            if (score > 0) app to score else null
+            if (score > 0) app to rank(score, usage[app.key] ?: 0) else null
         }.sortedWith(
-            compareByDescending<Pair<AppEntry, Int>> { it.second }
+            compareByDescending<Pair<AppEntry, Double>> { it.second }
                 .thenByDescending { usage[it.first.key] ?: 0 },
-        ).map { it.first }
+        )
     }
 
     /**
+     * Ranking value of a match. Normally the bare match score. With the boost
+     * on it is multiplied by 1 + ln(1 + launches): an app opened 20 times gets
+     * ×4, 100 times ×5.6, so a word-start match (70) of a daily app beats a
+     * name-start match (90) of one opened once or twice, while the gain from
+     * each further launch shrinks.
+     */
+    private fun rank(score: Int, launches: Int): Double =
+        if (state.usageBoost) score * (1 + ln(1.0 + launches)) else score.toDouble()
+
+    /**
      * Apps and favourite contacts together, best first. Contacts only join in
-     * once something is typed, and an app wins a tie.
+     * once something is typed, and an app wins a tie. Contacts have no launch
+     * count, so the boost leaves their score as it is.
      */
     fun searchAll(query: String): List<Hit> {
-        val apps = search(query)
-        if (query.isEmpty() || contacts.isEmpty()) return apps.map { Hit.App(it) }
-        val scored = apps.map { Hit.App(it) to T9.score(it.t9, query) } +
+        val apps = searchScored(query)
+        if (query.isEmpty() || contacts.isEmpty()) return apps.map { Hit.App(it.first) }
+        val scored = apps.map { Hit.App(it.first) to it.second } +
             contacts.mapNotNull { c ->
                 val score = T9.score(c.t9, query)
-                if (score > 0) Hit.Contact(c) to score else null
+                if (score > 0) Hit.Contact(c) to score.toDouble() else null
             }
         // sortedByDescending is stable, so apps keep their order and stay ahead on ties
         return scored.sortedByDescending { it.second }.map { it.first }
     }
+
+    fun setUsageBoost(on: Boolean) = update { it.copy(usageBoost = on) }
 
     fun setShowRecent(on: Boolean) = update { it.copy(showRecent = on) }
 

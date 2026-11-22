@@ -50,6 +50,11 @@ data class LauncherState(
     val recent: List<String> = emptyList(),
     /** The empty keypad lists the last launched apps instead of the most used ones. */
     val showRecent: Boolean = false,
+    /**
+     * Experimental: launch counts multiply the match score instead of only
+     * breaking ties, so an often used app climbs over a better but rarely used match.
+     */
+    val usageBoost: Boolean = false,
     /** Apps the user chose to keep out of T9 results. */
     val hiddenT9: Set<String> = emptySet(),
     /** The T9 keypad sits on the home screen with a column of three apps beside it, replacing the dock. */
