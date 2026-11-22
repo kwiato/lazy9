@@ -51,6 +51,8 @@
     <string name="settings_recent_desc">The empty keypad shows the last opened apps instead of the most used</string>
     <string name="settings_usage_boost">Experimental: frequency in T9</string>
     <string name="settings_usage_boost_desc">Matches are weighted by how often you open each app, not only by how well the name fits</string>
+    <string name="settings_t9_debug">T9 debug</string>
+    <string name="settings_t9_debug_desc">Above the keypad: every match with its rule, points, launch count, multiplier and final value</string>
     <string name="settings_autolaunch">Launch a single T9 match</string>
     <string name="settings_autolaunch_desc">Open the app straight away when only one matches</string>
     <string name="settings_contacts">Favourite contacts in T9</string>

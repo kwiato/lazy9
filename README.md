@@ -28,6 +28,11 @@ A minimalist Android launcher built around T9 app search.
     its match score (×(1 + ln(1 + launches))) instead of only breaking ties,
     so a daily app whose second word matches beats a rarely used one whose
     name starts with the typed letters.
+  - *T9 debug*: a table above the keypad with every match, the rule that
+    matched (whole name 100, name start 90, word start 70, initials 60,
+    inside 30), launch count, multiplier and the final value. On the empty
+    keypad it lists all launch counters, including ones whose app no longer
+    exists under that key (renamed launcher activity).
   - *Favourite contacts in T9*: starred contacts show up in the results; tap
     one to call, hold it for SMS and whatever your messengers (Signal,
     WhatsApp, Telegram, …) offer for that contact. Needs the contacts and phone permissions, asked for only when

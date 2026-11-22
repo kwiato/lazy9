@@ -222,6 +222,66 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setUsageBoost(on: Boolean) = update { it.copy(usageBoost = on) }
 
+    fun setT9Debug(on: Boolean) = update { it.copy(t9Debug = on) }
+
+    /** One line of the T9 debug table. */
+    class DebugRow(
+        val label: String,
+        val key: String,
+        val digits: String,
+        val match: T9.Match?,
+        val launches: Int,
+        val multiplier: Double,
+        val value: Double,
+        /** Position in the last-launched list, -1 if not there. */
+        val recent: Int,
+        val hidden: Boolean,
+        val private: Boolean,
+        val contact: Boolean = false,
+    )
+
+    /**
+     * Everything [searchAll] weighs, for every app that matches (hidden ones
+     * too, marked), in the order the results show. Empty query: every app
+     * with a launch count, most used first.
+     */
+    fun debugRows(query: String): List<DebugRow> {
+        val usage = state.usage
+        val boost = state.usageBoost
+        fun row(app: AppEntry, m: T9.Match?): DebugRow {
+            val n = usage[app.key] ?: 0
+            val mult = if (boost) 1 + ln(1.0 + n) else 1.0
+            return DebugRow(
+                label = app.label, key = app.key, digits = app.t9.joined, match = m, launches = n,
+                multiplier = mult, value = (m?.points ?: 0) * mult, recent = state.recent.indexOf(app.key),
+                hidden = app.key in state.hiddenT9, private = app.isPrivate,
+            )
+        }
+        if (query.isEmpty()) {
+            // Counters whose key matches no installed activity: the app renamed its
+            // launcher activity or changed profile, so its launches count under a new key.
+            val orphans = usage.filterKeys { it !in appsByKey }.map { (key, n) ->
+                DebugRow(ORPHAN, key, "", null, n, 1.0, 0.0, state.recent.indexOf(key), false, false)
+            }
+            return apps.filter { (usage[it.key] ?: 0) > 0 }.map { row(it, null) }.sortedByDescending { it.launches } +
+                orphans.sortedByDescending { it.launches }
+        }
+        val rows = apps.mapNotNull { app -> T9.match(app.t9, query)?.let { row(app, it) } }
+            .sortedWith(
+                compareBy<DebugRow> { it.hidden }
+                    .thenByDescending { it.value }
+                    .thenByDescending { it.launches },
+            )
+        val people = contacts.mapNotNull { c ->
+            T9.match(c.t9, query)?.let {
+                DebugRow(c.name, "", c.t9.joined, it, 0, 1.0, it.points.toDouble(), -1, false, false, contact = true)
+            }
+        }
+        if (people.isEmpty()) return rows
+        // Same merge as searchAll: stable sort, apps stay ahead on ties; hidden apps last.
+        return (rows.filter { !it.hidden } + people).sortedByDescending { it.value } + rows.filter { it.hidden }
+    }
+
     fun setShowRecent(on: Boolean) = update { it.copy(showRecent = on) }
 
     fun setHiddenT9(key: String, hidden: Boolean) =
@@ -472,5 +532,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val RECENT_MAX = 12
+        /** Label of a debug row for a launch counter with no matching app. */
+        const val ORPHAN = "(no such app)"
     }
 }

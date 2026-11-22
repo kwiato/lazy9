@@ -49,6 +49,8 @@
     <string name="settings_recent_desc">Pusta klawiatura pokazuje ostatnio otwierane aplikacje zamiast najczęściej używanych</string>
     <string name="settings_usage_boost">Eksperymentalne: częstość w T9</string>
     <string name="settings_usage_boost_desc">Wyniki ważone tym, jak często otwierasz aplikację, a nie tylko dopasowaniem nazwy</string>
+    <string name="settings_t9_debug">Debug T9</string>
+    <string name="settings_t9_debug_desc">Nad klawiaturą każde trafienie z regułą, punktami, liczbą uruchomień, mnożnikiem i wynikiem</string>
     <string name="settings_autolaunch">Uruchamiaj jedyne dopasowanie T9</string>
     <string name="settings_autolaunch_desc">Otwórz aplikację od razu, gdy pasuje tylko jedna</string>
     <string name="settings_contacts">Ulubione kontakty w T9</string>

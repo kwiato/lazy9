@@ -57,14 +57,22 @@ object T9 {
         return T9Name(joined.toString(), starts.toIntArray(), initials)
     }
 
-    /** 0 = no match; higher = better. */
-    fun score(name: T9Name, query: String): Int {
-        if (query.isEmpty()) return 0
-        val j = name.joined
-        if (j.startsWith(query)) return if (j.length == query.length) 100 else 90
-        for (s in name.starts) if (s > 0 && j.startsWith(query, s)) return 70
-        if (query.length >= 2 && name.initials.startsWith(query)) return 60
-        if (query.length >= 3 && j.contains(query)) return 30
-        return 0
+    /** How a query matched a name; [points] is the score the ranking starts from. */
+    enum class Match(val points: Int) {
+        WHOLE(100), PREFIX(90), WORD(70), INITIALS(60), INSIDE(30)
     }
+
+    /** Which rule matched, or null. Rules are tried best first, the first one wins. */
+    fun match(name: T9Name, query: String): Match? {
+        if (query.isEmpty()) return null
+        val j = name.joined
+        if (j.startsWith(query)) return if (j.length == query.length) Match.WHOLE else Match.PREFIX
+        for (s in name.starts) if (s > 0 && j.startsWith(query, s)) return Match.WORD
+        if (query.length >= 2 && name.initials.startsWith(query)) return Match.INITIALS
+        if (query.length >= 3 && j.contains(query)) return Match.INSIDE
+        return null
+    }
+
+    /** 0 = no match; higher = better. */
+    fun score(name: T9Name, query: String): Int = match(name, query)?.points ?: 0
 }

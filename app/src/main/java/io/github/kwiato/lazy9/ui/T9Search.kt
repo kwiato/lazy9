@@ -45,6 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
@@ -190,6 +193,8 @@ fun T9Panel(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (vm.state.t9Debug) T9Debug(vm, query, ink)
+
         // Results: up to three icons, best match first, centred when fewer.
         // Deliberately bare: no typed digits, no labels, no hint.
         Box(
@@ -460,6 +465,56 @@ private fun KeyLabel(digit: String, letters: String, digitSize: TextUnit, letter
                 lineHeight = letterSize * 1.2f,
                 letterSpacing = 1.5.sp,
             )
+        }
+    }
+}
+
+/**
+ * Debug table: every match with the rule that matched, its points, the
+ * launch count and multiplier, and the value results are sorted by.
+ * Rows in the order the results show; hidden apps at the end, struck out.
+ */
+@Composable
+private fun T9Debug(vm: LauncherViewModel, query: String, ink: Color) {
+    val rows = remember(query, vm.apps, vm.state, vm.contacts) { vm.debugRows(query) }
+    val usage = vm.state.usage
+    val mono = androidx.compose.ui.text.TextStyle(
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        fontSize = 10.sp,
+        lineHeight = 13.sp,
+        color = ink,
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(max = 220.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ink.copy(alpha = 0.08f))
+            .verticalScroll(rememberScrollState())
+            .padding(8.dp),
+    ) {
+        Text(
+            "q=\"$query\"  boost=${if (vm.state.usageBoost) "ON" else "off"}  recent=${vm.state.showRecent}  " +
+                "apps=${vm.apps.size}  counted=${usage.size}  sum=${usage.values.sum()}  hits=${rows.size}",
+            style = mono.copy(color = ink.copy(alpha = 0.7f)),
+        )
+        rows.forEachIndexed { i, r ->
+            val rule = r.match?.let { "${it.name} ${it.points}" } ?: "-"
+            val mult = if (r.multiplier == 1.0) "×1" else "×1+ln(1+${r.launches})=" + "%.2f".format(r.multiplier)
+            val flags = buildList {
+                if (r.contact) add("contact")
+                if (r.hidden) add("HIDDEN")
+                if (r.private) add("private: not counted")
+                if (r.recent >= 0) add("recent#${r.recent + 1}")
+            }.joinToString(" ")
+            Text(
+                "${i + 1}. ${r.label}  $rule $mult = ${"%.1f".format(r.value)}  n=${r.launches} $flags",
+                style = mono.copy(
+                    fontWeight = if (i < MAX_RESULTS && !r.hidden) FontWeight.Bold else FontWeight.Normal,
+                    textDecoration = if (r.hidden) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                ),
+            )
+            Text("   ${r.digits}  ${r.key}", style = mono.copy(color = ink.copy(alpha = 0.5f)), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

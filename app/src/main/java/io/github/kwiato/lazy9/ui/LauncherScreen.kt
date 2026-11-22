@@ -58,6 +58,7 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.InvertColors
 import androidx.compose.material.icons.outlined.Palette
@@ -460,6 +461,12 @@ fun LauncherScreen(
                     stringResource(R.string.settings_usage_boost_desc),
                     trailing = { Switch(checked = vm.state.usageBoost, onCheckedChange = { vm.setUsageBoost(it) }) },
                 ) { vm.setUsageBoost(!vm.state.usageBoost) }
+                SheetRow(
+                    Icons.Outlined.BugReport,
+                    stringResource(R.string.settings_t9_debug),
+                    stringResource(R.string.settings_t9_debug_desc),
+                    trailing = { Switch(checked = vm.state.t9Debug, onCheckedChange = { vm.setT9Debug(it) }) },
+                ) { vm.setT9Debug(!vm.state.t9Debug) }
                 val toggleContacts = { on: Boolean ->
                     vm.setContacts(on)
                     if (on) host.requestContactAccess()

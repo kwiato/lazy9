@@ -55,6 +55,8 @@ data class LauncherState(
      * breaking ties, so an often used app climbs over a better but rarely used match.
      */
     val usageBoost: Boolean = false,
+    /** Shows how T9 ranked every match (rule, points, launches, multiplier) above the keypad. */
+    val t9Debug: Boolean = false,
     /** Apps the user chose to keep out of T9 results. */
     val hiddenT9: Set<String> = emptySet(),
     /** The T9 keypad sits on the home screen with a column of three apps beside it, replacing the dock. */
