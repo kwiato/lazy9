@@ -24,13 +24,15 @@ A minimalist Android launcher built around T9 app search.
   - *T9 card appearance*: colour, opacity, width, key height and the size of
     digits and letters, edited over the live card.
   - *Monochrome icons*: one-colour icons in the wallpaper palette.
-  - *Experimental: frequency in T9*: how often you open an app multiplies
-    its match score (×(1 + ln(1 + launches))) instead of only breaking ties,
-    so a daily app whose second word matches beats a rarely used one whose
-    name starts with the typed letters.
+  - *Experimental: adaptive T9 order*: every app has 0–5 points. Opening
+    it adds one; the other apps T9 showed during that search (from the first
+    digit on) and you passed over lose one. Launches from the dock, desktop or
+    app list only add. The match score is scaled by 1 + points/5, so the order
+    follows changed habits within days instead of all-time launch counts.
+    Points are tracked even while the option is off.
   - *T9 debug*: a table above the keypad with every match, the rule that
     matched (whole name 100, name start 90, word start 70, initials 60,
-    inside 30), launch count, multiplier and the final value. On the empty
+    inside 30), points, launch count, multiplier and the final value. On the empty
     keypad it lists all launch counters, including ones whose app no longer
     exists under that key (renamed launcher activity).
   - *Favourite contacts in T9*: starred contacts show up in the results; tap

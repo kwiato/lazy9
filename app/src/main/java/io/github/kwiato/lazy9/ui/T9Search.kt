@@ -163,13 +163,18 @@ fun T9Panel(
     val haptic = LocalHapticFeedback.current
     val matches = remember(query, vm.apps, vm.state, vm.contacts) { vm.searchAll(query) }
     val shown = matches.take(MAX_RESULTS)
+    // Every app shown since the first digit: the ones not chosen lose a rating point.
+    val seen = remember(resetKey) { mutableSetOf<String>() }
+    if (query.isEmpty()) seen.clear()
+    else shown.forEach { if (it is Hit.App) seen += it.app.key }
+    val passedOver = { chosen: AppEntry -> seen - chosen.key }
 
     if (vm.state.autoLaunch) {
         LaunchedEffect(matches) {
             // Only ever an app: a phone call must not start by itself.
             val only = matches.singleOrNull() as? Hit.App
             if (query.length >= 2 && only != null) {
-                vm.launch(only.app)
+                vm.launch(only.app, passedOver(only.app))
                 onLaunched()
             }
         }
@@ -193,7 +198,7 @@ fun T9Panel(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (vm.state.t9Debug) T9Debug(vm, query, ink)
+        if (vm.state.t9Debug) T9Debug(vm, query, ink, seen)
 
         // Results: up to three icons, best match first, centred when fewer.
         // Deliberately bare: no typed digits, no labels, no hint.
@@ -222,7 +227,7 @@ fun T9Panel(
                             .height(80.dp)
                             .clip(RoundedCornerShape(18.dp))
                         when (hit) {
-                            is Hit.App -> AppResult(hit.app, vm, host, onLaunched, cell)
+                            is Hit.App -> AppResult(hit.app, vm, host, { onLaunched() }, cell, if (query.isEmpty()) emptySet() else passedOver(hit.app))
                             is Hit.Contact -> ContactResult(hit.contact, vm, host, onLaunched, cell)
                         }
                     }
@@ -258,6 +263,8 @@ private fun AppResult(
     host: LauncherHost,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Other apps this search showed; they lose a rating point when this one opens. */
+    passedOver: Set<String> = emptySet(),
 ) {
     val haptic = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
@@ -268,7 +275,7 @@ private fun AppResult(
                 .fillMaxSize()
                 .combinedClickable(
                     onClick = {
-                        vm.launch(app)
+                        vm.launch(app, passedOver)
                         onDone()
                     },
                     onLongClick = {
@@ -475,7 +482,7 @@ private fun KeyLabel(digit: String, letters: String, digitSize: TextUnit, letter
  * Rows in the order the results show; hidden apps at the end, struck out.
  */
 @Composable
-private fun T9Debug(vm: LauncherViewModel, query: String, ink: Color) {
+private fun T9Debug(vm: LauncherViewModel, query: String, ink: Color, seen: Set<String>) {
     val rows = remember(query, vm.apps, vm.state, vm.contacts) { vm.debugRows(query) }
     val usage = vm.state.usage
     val mono = androidx.compose.ui.text.TextStyle(
@@ -494,13 +501,13 @@ private fun T9Debug(vm: LauncherViewModel, query: String, ink: Color) {
             .padding(8.dp),
     ) {
         Text(
-            "q=\"$query\"  boost=${if (vm.state.usageBoost) "ON" else "off"}  recent=${vm.state.showRecent}  " +
+            "q=\"$query\"  adaptive=${if (vm.state.adaptiveRank) "ON" else "off"}  seen=${seen.size}  recent=${vm.state.showRecent}  " +
                 "apps=${vm.apps.size}  counted=${usage.size}  sum=${usage.values.sum()}  hits=${rows.size}",
             style = mono.copy(color = ink.copy(alpha = 0.7f)),
         )
         rows.forEachIndexed { i, r ->
             val rule = r.match?.let { "${it.name} ${it.points}" } ?: "-"
-            val mult = if (r.multiplier == 1.0) "×1" else "×1+ln(1+${r.launches})=" + "%.2f".format(r.multiplier)
+            val mult = if (r.multiplier == 1.0) "×1" else "×(1+${r.rating}/5)=" + "%.1f".format(r.multiplier)
             val flags = buildList {
                 if (r.contact) add("contact")
                 if (r.hidden) add("HIDDEN")
@@ -508,7 +515,7 @@ private fun T9Debug(vm: LauncherViewModel, query: String, ink: Color) {
                 if (r.recent >= 0) add("recent#${r.recent + 1}")
             }.joinToString(" ")
             Text(
-                "${i + 1}. ${r.label}  $rule $mult = ${"%.1f".format(r.value)}  n=${r.launches} $flags",
+                "${i + 1}. ${r.label}  $rule $mult = ${"%.1f".format(r.value)}  r=${r.rating}/5 n=${r.launches} $flags",
                 style = mono.copy(
                     fontWeight = if (i < MAX_RESULTS && !r.hidden) FontWeight.Bold else FontWeight.Normal,
                     textDecoration = if (r.hidden) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,

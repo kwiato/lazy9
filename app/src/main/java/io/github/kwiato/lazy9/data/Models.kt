@@ -51,10 +51,16 @@ data class LauncherState(
     /** The empty keypad lists the last launched apps instead of the most used ones. */
     val showRecent: Boolean = false,
     /**
-     * Experimental: launch counts multiply the match score instead of only
-     * breaking ties, so an often used app climbs over a better but rarely used match.
+     * Experimental: T9 ranks by [ratings] instead of the all-time launch count,
+     * so the order follows changed habits within a few days.
      */
-    val usageBoost: Boolean = false,
+    val adaptiveRank: Boolean = false,
+    /**
+     * 0–5 per app key, absent = 0. Opening an app adds a point; apps T9 showed
+     * in the same search and that were passed over lose one. Kept up to date
+     * even while [adaptiveRank] is off, so switching it on starts with real data.
+     */
+    val ratings: Map<String, Int> = emptyMap(),
     /** Shows how T9 ranked every match (rule, points, launches, multiplier) above the keypad. */
     val t9Debug: Boolean = false,
     /** Apps the user chose to keep out of T9 results. */

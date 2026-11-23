@@ -27,7 +27,6 @@ import io.github.kwiato.lazy9.data.StateStore
 import io.github.kwiato.lazy9.data.T9
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlin.math.ln
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
@@ -64,6 +63,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                     items = s.items.filterNot { gone(it.appKey) },
                     dock = s.dock.map { if (gone(it)) null else it },
                     usage = s.usage.filterKeys { !gone(it) },
+                    ratings = s.ratings.filterKeys { !gone(it) },
                     recent = s.recent.filterNot { gone(it) },
                     hiddenT9 = s.hiddenT9.filterNot { gone(it) }.toSet(),
                 )
@@ -147,7 +147,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- launching & search -------------------------------------------------
 
-    fun launch(app: AppEntry) {
+    /**
+     * Opens [app] and counts it. [passedOver] are the other apps T9 showed
+     * during this search: each loses a rating point, the opened one gains one.
+     */
+    fun launch(app: AppEntry, passedOver: Collection<String> = emptyList()) {
         try {
             repo.launch(app)
         } catch (e: Exception) {
@@ -159,15 +163,27 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 usage = it.usage + (app.key to (it.usage[app.key] ?: 0) + 1),
                 recent = (listOf(app.key) + it.recent.filter { key -> key != app.key }).take(RECENT_MAX),
+                ratings = rate(it.ratings, app.key, passedOver),
             )
         }
     }
 
+    private fun rate(ratings: Map<String, Int>, chosen: String, passedOver: Collection<String>): Map<String, Int> {
+        val next = ratings.toMutableMap()
+        next[chosen] = ((next[chosen] ?: 0) + 1).coerceAtMost(RATING_MAX)
+        for (key in passedOver) {
+            if (key == chosen || appsByKey[key]?.isPrivate == true) continue
+            val r = (next[key] ?: 0) - 1
+            if (r > 0) next[key] = r else next.remove(key)
+        }
+        return next
+    }
+
     /**
      * T9 matches, best first; among equally good matches the more often
-     * launched app wins. With [LauncherState.usageBoost] the launch count
-     * multiplies the match score instead (see [rank]). An empty query lists
-     * the most used apps, or the last launched ones when that option is on.
+     * launched app wins. With [LauncherState.adaptiveRank] the app's rating
+     * scales the match score instead (see [rank]). An empty query lists the
+     * most used (or best rated) apps, or the last launched ones when that option is on.
      * Apps hidden from T9 never show.
      */
     fun search(query: String): List<AppEntry> = searchScored(query).map { it.first }
@@ -180,33 +196,38 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 state.recent.mapNotNull { appsByKey[it] }.filter { it.key !in hidden }
             } else {
                 apps.filter { (usage[it.key] ?: 0) > 0 && it.key !in hidden }
-                    .sortedByDescending { usage[it.key] ?: 0 }
+                    .sortedWith(
+                        compareByDescending<AppEntry> { if (state.adaptiveRank) state.ratings[it.key] ?: 0 else 0 }
+                            .thenByDescending { usage[it.key] ?: 0 },
+                    )
             }
             return list.map { it to 0.0 }
         }
         return apps.mapNotNull { app ->
             val score = if (app.key in hidden) 0 else T9.score(app.t9, query)
-            if (score > 0) app to rank(score, usage[app.key] ?: 0) else null
+            if (score > 0) app to rank(score, state.ratings[app.key] ?: 0) else null
         }.sortedWith(
             compareByDescending<Pair<AppEntry, Double>> { it.second }
+                .thenByDescending { if (state.adaptiveRank) state.ratings[it.first.key] ?: 0 else 0 }
                 .thenByDescending { usage[it.first.key] ?: 0 },
         )
     }
 
     /**
-     * Ranking value of a match. Normally the bare match score. With the boost
-     * on it is multiplied by 1 + ln(1 + launches): an app opened 20 times gets
-     * ×4, 100 times ×5.6, so a word-start match (70) of a daily app beats a
-     * name-start match (90) of one opened once or twice, while the gain from
-     * each further launch shrinks.
+     * Ranking value of a match. Normally the bare match score. With adaptive
+     * ranking it is scaled by 1 + rating/5, i.e. ×1 to ×2: a word-start match
+     * (70) of an app rated 5 beats a name-start match (90) rated 0–2, ties
+     * between equal matches go to the better rated app.
      */
-    private fun rank(score: Int, launches: Int): Double =
-        if (state.usageBoost) score * (1 + ln(1.0 + launches)) else score.toDouble()
+    private fun rank(score: Int, rating: Int): Double = score * multiplier(rating)
+
+    private fun multiplier(rating: Int): Double =
+        if (state.adaptiveRank) 1 + rating.toDouble() / RATING_MAX else 1.0
 
     /**
      * Apps and favourite contacts together, best first. Contacts only join in
-     * once something is typed, and an app wins a tie. Contacts have no launch
-     * count, so the boost leaves their score as it is.
+     * once something is typed, and an app wins a tie. Contacts have no
+     * rating, so their score stays as it is.
      */
     fun searchAll(query: String): List<Hit> {
         val apps = searchScored(query)
@@ -220,7 +241,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         return scored.sortedByDescending { it.second }.map { it.first }
     }
 
-    fun setUsageBoost(on: Boolean) = update { it.copy(usageBoost = on) }
+    fun setAdaptiveRank(on: Boolean) = update { it.copy(adaptiveRank = on) }
 
     fun setT9Debug(on: Boolean) = update { it.copy(t9Debug = on) }
 
@@ -231,6 +252,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val digits: String,
         val match: T9.Match?,
         val launches: Int,
+        val rating: Int,
         val multiplier: Double,
         val value: Double,
         /** Position in the last-launched list, -1 if not there. */
@@ -247,13 +269,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun debugRows(query: String): List<DebugRow> {
         val usage = state.usage
-        val boost = state.usageBoost
         fun row(app: AppEntry, m: T9.Match?): DebugRow {
             val n = usage[app.key] ?: 0
-            val mult = if (boost) 1 + ln(1.0 + n) else 1.0
+            val r = state.ratings[app.key] ?: 0
+            val mult = multiplier(r)
             return DebugRow(
                 label = app.label, key = app.key, digits = app.t9.joined, match = m, launches = n,
-                multiplier = mult, value = (m?.points ?: 0) * mult, recent = state.recent.indexOf(app.key),
+                rating = r, multiplier = mult, value = (m?.points ?: 0) * mult, recent = state.recent.indexOf(app.key),
                 hidden = app.key in state.hiddenT9, private = app.isPrivate,
             )
         }
@@ -261,20 +283,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             // Counters whose key matches no installed activity: the app renamed its
             // launcher activity or changed profile, so its launches count under a new key.
             val orphans = usage.filterKeys { it !in appsByKey }.map { (key, n) ->
-                DebugRow(ORPHAN, key, "", null, n, 1.0, 0.0, state.recent.indexOf(key), false, false)
+                DebugRow(ORPHAN, key, "", null, n, state.ratings[key] ?: 0, 1.0, 0.0, state.recent.indexOf(key), false, false)
             }
-            return apps.filter { (usage[it.key] ?: 0) > 0 }.map { row(it, null) }.sortedByDescending { it.launches } +
+            return apps.filter { (usage[it.key] ?: 0) > 0 || it.key in state.ratings }.map { row(it, null) }
+                .sortedWith(compareByDescending<DebugRow> { if (state.adaptiveRank) it.rating else 0 }.thenByDescending { it.launches }) +
                 orphans.sortedByDescending { it.launches }
         }
         val rows = apps.mapNotNull { app -> T9.match(app.t9, query)?.let { row(app, it) } }
             .sortedWith(
                 compareBy<DebugRow> { it.hidden }
                     .thenByDescending { it.value }
+                    .thenByDescending { if (state.adaptiveRank) it.rating else 0 }
                     .thenByDescending { it.launches },
             )
         val people = contacts.mapNotNull { c ->
             T9.match(c.t9, query)?.let {
-                DebugRow(c.name, "", c.t9.joined, it, 0, 1.0, it.points.toDouble(), -1, false, false, contact = true)
+                DebugRow(c.name, "", c.t9.joined, it, 0, 0, 1.0, it.points.toDouble(), -1, false, false, contact = true)
             }
         }
         if (people.isEmpty()) return rows
@@ -532,6 +556,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val RECENT_MAX = 12
+        const val RATING_MAX = 5
         /** Label of a debug row for a launch counter with no matching app. */
         const val ORPHAN = "(no such app)"
     }

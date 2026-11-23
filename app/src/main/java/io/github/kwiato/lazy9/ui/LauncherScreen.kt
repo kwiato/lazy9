@@ -459,8 +459,8 @@ fun LauncherScreen(
                     Icons.Outlined.Science,
                     stringResource(R.string.settings_usage_boost),
                     stringResource(R.string.settings_usage_boost_desc),
-                    trailing = { Switch(checked = vm.state.usageBoost, onCheckedChange = { vm.setUsageBoost(it) }) },
-                ) { vm.setUsageBoost(!vm.state.usageBoost) }
+                    trailing = { Switch(checked = vm.state.adaptiveRank, onCheckedChange = { vm.setAdaptiveRank(it) }) },
+                ) { vm.setAdaptiveRank(!vm.state.adaptiveRank) }
                 SheetRow(
                     Icons.Outlined.BugReport,
                     stringResource(R.string.settings_t9_debug),

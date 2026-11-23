@@ -49,8 +49,8 @@
     <string name="menu_hide_t9">Hide from T9</string>
     <string name="settings_recent">Recent apps in T9</string>
     <string name="settings_recent_desc">The empty keypad shows the last opened apps instead of the most used</string>
-    <string name="settings_usage_boost">Experimental: frequency in T9</string>
-    <string name="settings_usage_boost_desc">Matches are weighted by how often you open each app, not only by how well the name fits</string>
+    <string name="settings_usage_boost">Experimental: adaptive T9 order</string>
+    <string name="settings_usage_boost_desc">Each app has 0–5 points: opening it adds one, apps T9 showed and you passed over lose one</string>
     <string name="settings_t9_debug">T9 debug</string>
     <string name="settings_t9_debug_desc">Above the keypad: every match with its rule, points, launch count, multiplier and final value</string>
     <string name="settings_autolaunch">Launch a single T9 match</string>
